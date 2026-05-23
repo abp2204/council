@@ -35,9 +35,11 @@ class MockOpposingRole:
     def __init__(self, case_id: str) -> None:
         case = load_case(case_id)
         opp = case["opposing_role"]
-        self._mock_probes = opp["mock_probes"]
-        self._mock_close = opp["mock_close"]
+        self._mock_probes: list[str] = opp["mock_probes"]
+        self._mock_close: str = opp["mock_close"]
         self._probes_asked: list[int] = []
+        user_role = case.get("user_role", "")
+        self._addressee: str = user_role.split()[1] if " " in user_role else "Counsel"
 
     def respond(self, turn_history: list[dict]) -> tuple[str, bool]:
         user_turns = [t for t in turn_history if t.get("role") == "user"]
@@ -62,7 +64,7 @@ class MockOpposingRole:
 
         # All probes asked but not enough user turns yet — press on the last one
         return (
-            "Mr. Marshall, you have not yet given me a satisfactory answer. "
+            f"Mr. {self._addressee}, you have not yet given me a satisfactory answer. "
             "Let me put the question again: " + self._mock_probes[self._probes_asked[-1]],
             False,
         )
@@ -73,14 +75,14 @@ class MockOpposingRole:
 
         if len(words) <= 2:
             return (
-                f"That is not an answer, Mr. Marshall. \"{text}\" tells me nothing "
+                f"That is not an answer, Mr. {self._addressee}. \"{text}\" tells me nothing "
                 "about the constitutional basis for your position. "
                 "I am asking you to explain the doctrinal framework."
             )
 
         if any(ord(c) > 127 for c in text):
             return (
-                "I confess I did not follow that, Mr. Marshall. "
+                f"I confess I did not follow that, Mr. {self._addressee}. "
                 "Would you kindly restate your argument for the Court?"
             )
 
@@ -88,7 +90,7 @@ class MockOpposingRole:
                            "segregation is constitutional", "i concede that plessy")
         if any(phrase in lower for phrase in pro_segregation):
             return (
-                "Mr. Marshall, are you now conceding that Plessy controls? "
+                f"Mr. {self._addressee}, are you now conceding that Plessy controls? "
                 "That is rather remarkable for counsel who has argued the opposite "
                 "in every court below. Do you wish to be heard on behalf of the "
                 "respondents instead?"
@@ -97,7 +99,7 @@ class MockOpposingRole:
         off_topic = ("contract", "tort", "property law", "negligence", "common law")
         if any(phrase in lower for phrase in off_topic):
             return (
-                "Mr. Marshall, we are not here on questions of common law. "
+                f"Mr. {self._addressee}, we are not here on questions of common law. "
                 "The issue before us is one of constitutional law under the "
                 "Fourteenth Amendment. Kindly direct your argument there."
             )
