@@ -23,7 +23,7 @@ from session_engine import (
 
 @pytest.fixture(scope="module")
 def brown_case() -> dict:
-    return load_case("brown", operator=True)
+    return load_case("brown")
 
 
 @pytest.fixture(scope="module")
@@ -37,8 +37,14 @@ def mock_close(brown_case) -> str:
 
 
 def make_engine(mock_probes: list[str], mock_close: str) -> SessionEngine:
+    def factory(case: dict) -> MockOpposingRole:
+        return MockOpposingRole(
+            mock_probes=mock_probes,
+            mock_close=mock_close,
+        )
+
     return SessionEngine(
-        opposing_role=MockOpposingRole(mock_probes=mock_probes, mock_close=mock_close),
+        opposing_role_factory=factory,
         evaluator=MockEvaluator(),
     )
 
@@ -379,12 +385,11 @@ def test_full_session_flow_no_api_calls(mock_probes, mock_close):
         "plessy was wrongly decided",
         "the framers intended to end racial caste",
     ]
-    result = None
     for move in moves:
         s = engine._sessions[session_id]
         if s.state != State.IN_SESSION:
             break
-        result = engine.submit_move(session_id, move)
+        engine.submit_move(session_id, move)
 
     s = engine._sessions[session_id]
     if s.state == State.IN_SESSION:
@@ -399,3 +404,67 @@ def test_full_session_flow_no_api_calls(mock_probes, mock_close):
     if score.key_moments:
         moment = engine.review(session_id, 0)
         assert moment.label in ("best_move", "worst_move", "deviation_point")
+
+
+def test_constructor_raises_if_factory_is_none():
+    with pytest.raises(ValueError, match="opposing_role_factory"):
+        SessionEngine(opposing_role_factory=None, evaluator=MockEvaluator())
+
+
+def test_constructor_raises_if_evaluator_is_none():
+    def factory(case: dict) -> MockOpposingRole:
+        opp = case["opposing_role"]
+        return MockOpposingRole(mock_probes=opp["mock_probes"], mock_close=opp["mock_close"])
+
+    with pytest.raises(ValueError, match="evaluator"):
+        SessionEngine(opposing_role_factory=factory, evaluator=None)
+
+
+def test_create_session_invalid_case_id_raises(mock_probes, mock_close):
+    engine = make_engine(mock_probes, mock_close)
+    with pytest.raises(KeyError):
+        engine.create_session("nonexistent-case")
+
+
+def test_review_empty_key_moments_raises(mock_probes, mock_close):
+    """review() with no key moments raises IndexError with a clear message."""
+    engine = make_engine(mock_probes, mock_close)
+    session_id = engine.create_session("brown")
+    engine._sessions[session_id].state = State.SESSION_END
+
+    score = engine.evaluate(session_id)
+    score.key_moments.clear()
+
+    with pytest.raises(IndexError, match="no key moments available"):
+        engine.review(session_id, 0)
+
+
+def test_evaluate_rollback_on_exception(mock_probes, mock_close):
+    """evaluate() restores SESSION_END state if the evaluator raises."""
+
+    class BrokenEvaluator:
+        def evaluate(self, session_state):
+            raise RuntimeError("evaluator exploded")
+
+    def factory(case: dict) -> MockOpposingRole:
+        return MockOpposingRole(mock_probes=mock_probes, mock_close=mock_close)
+
+    engine = SessionEngine(opposing_role_factory=factory, evaluator=BrokenEvaluator())
+    session_id = engine.create_session("brown")
+    engine._sessions[session_id].state = State.SESSION_END
+
+    with pytest.raises(RuntimeError, match="evaluator exploded"):
+        engine.evaluate(session_id)
+
+    assert engine._sessions[session_id].state == State.SESSION_END
+
+
+def test_each_session_gets_fresh_opposing_role(mock_probes, mock_close):
+    """Two sessions created from the same engine must not share probe state."""
+    engine = make_engine(mock_probes, mock_close)
+    sid1 = engine.create_session("brown")
+    sid2 = engine.create_session("brown")
+
+    role1 = engine._sessions[sid1].opposing_role
+    role2 = engine._sessions[sid2].opposing_role
+    assert role1 is not role2
