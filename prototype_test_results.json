@@ -1,0 +1,1479 @@
+{
+  "findings": {
+    "total_sessions": 23,
+    "score_by_deviation_count": {
+      "0": {
+        "sessions": 7,
+        "avg_legal": 90,
+        "avg_strategic": 75,
+        "avg_creativity": 60,
+        "avg_overall": 75
+      },
+      "1": {
+        "sessions": 6,
+        "avg_legal": 82,
+        "avg_strategic": 75,
+        "avg_creativity": 72,
+        "avg_overall": 76
+      },
+      "2": {
+        "sessions": 6,
+        "avg_legal": 74,
+        "avg_strategic": 55,
+        "avg_creativity": 84,
+        "avg_overall": 71
+      },
+      "3": {
+        "sessions": 4,
+        "avg_legal": 66,
+        "avg_strategic": 55,
+        "avg_creativity": 95,
+        "avg_overall": 72
+      }
+    },
+    "key_moment_label_distribution": {
+      "best_move": 23,
+      "worst_move": 23,
+      "deviation_point": 16
+    },
+    "best_move_also_deviation_count": 13,
+    "same_turn_conflicts_best_and_deviation": [
+      {
+        "label": "A2 \u2014 one deviation (turn 1 deviates, turns 2-3 follow path)",
+        "conflicted_turns": [
+          2
+        ]
+      }
+    ],
+    "false_positive_deviation_candidates": [
+      {
+        "label": "A3 \u2014 two deviations (turns 1 and 2 deviate, turn 3 follows)",
+        "move_index": 1,
+        "text": "stare decisis cannot shield a decision that was constitution",
+        "historical_ref": "plessy was wrongly decided"
+      },
+      {
+        "label": "A4 \u2014 three deviations (all turns deviate)",
+        "move_index": 1,
+        "text": "overruling plessy is not judicial activism \u2014 it is the court",
+        "historical_ref": "plessy was wrongly decided"
+      },
+      {
+        "label": "B1 \u2014 one-word arguments",
+        "move_index": 0,
+        "text": "Unconstitutional.",
+        "historical_ref": "the constitution does not permit racial classification"
+      },
+      {
+        "label": "D3 \u2014 Socratic/question-heavy",
+        "move_index": 1,
+        "text": "What would it mean to follow Plessy faithfully? It would mea",
+        "historical_ref": "plessy was wrongly decided"
+      },
+      {
+        "label": "E1 \u2014 repeat same argument all three turns",
+        "move_index": 1,
+        "text": "Racial segregation in public schools violates the Fourteenth",
+        "historical_ref": "plessy was wrongly decided"
+      },
+      {
+        "label": "E3 \u2014 argue for the other side",
+        "move_index": 0,
+        "text": "Plessy was correctly decided. Separate but equal is a permis",
+        "historical_ref": "the constitution does not permit racial classification"
+      },
+      {
+        "label": "E4 \u2014 non-English argument",
+        "move_index": 0,
+        "text": "La segregaci\u00f3n racial en las escuelas p\u00fablicas viola la Deci",
+        "historical_ref": "the constitution does not permit racial classification"
+      },
+      {
+        "label": "E4 \u2014 non-English argument",
+        "move_index": 1,
+        "text": "Plessy contra Ferguson fue decidido incorrectamente y debe s",
+        "historical_ref": "plessy was wrongly decided"
+      }
+    ],
+    "unexpected_final_states": [],
+    "scoring_is_fully_deterministic_per_deviation_count": true,
+    "bugs": {
+      "scoring_ignores_argument_content": true,
+      "deviation_detection_is_keyword_overlap_only": true,
+      "evaluator_commentary_is_canned_not_generative": true,
+      "best_move_always_assigned_to_first_user_turn": true,
+      "worst_move_always_assigned_to_last_user_turn": true,
+      "turn_label_uses_absolute_index_not_user_turn_number": true
+    }
+  },
+  "sessions": [
+    {
+      "label": "A1 \u2014 zero deviations (exact historical keywords)",
+      "group": "A_deviation_sweep",
+      "notes": "All 3 moves use words directly from HISTORICAL_MOVES. Expect deviation_count=0.",
+      "moves": [
+        "the constitution does not permit racial classification in any form",
+        "plessy was wrongly decided and must be overruled by this court",
+        "the framers intended to end racial caste and that intent governs"
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "the constitution does not permit racial classification in any form"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "the framers intended to end racial caste and that intent governs"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "the constitution does not permit racial classification in an",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "plessy was wrongly decided and must be overruled by this cou",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "the framers intended to end racial caste and that intent gov",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "A2 \u2014 one deviation (turn 1 deviates, turns 2-3 follow path)",
+      "group": "A_deviation_sweep",
+      "notes": "Turn 1 goes off-script. Expect deviation_count=1.",
+      "moves": [
+        "separate but equal is a legal fiction that has never reflected reality",
+        "plessy was wrongly decided and the equal protection clause requires us to say so",
+        "the framers intended to eliminate the racial caste system that the amendment was designed to dismantle"
+      ],
+      "total_turns": 3,
+      "deviation_count": 1,
+      "deviation_per_turn": [
+        true,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 82,
+        "strategic_effectiveness": 75,
+        "creativity": 72,
+        "overall": 76
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "separate but equal is a legal fiction that has never reflected reality"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 2,
+          "user_text_preview": "separate but equal is a legal fiction that has never reflected reality"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "the framers intended to eliminate the racial caste system that the amendment was"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "separate but equal is a legal fiction that has never reflect",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "plessy was wrongly decided and the equal protection clause r",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "the framers intended to eliminate the racial caste system th",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "A3 \u2014 two deviations (turns 1 and 2 deviate, turn 3 follows)",
+      "group": "A_deviation_sweep",
+      "notes": "Expect deviation_count=2, creativity bump.",
+      "moves": [
+        "the psychological harm inflicted by segregation is indistinguishable from a state-sanctioned badge of inferiority",
+        "stare decisis cannot shield a decision that was constitutionally infirm from the moment it was handed down",
+        "the framers intended to end racial caste \u2014 their intent is the controlling principle here"
+      ],
+      "total_turns": 3,
+      "deviation_count": 2,
+      "deviation_per_turn": [
+        true,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 74,
+        "strategic_effectiveness": 55,
+        "creativity": 84,
+        "overall": 71
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "the psychological harm inflicted by segregation is indistinguishable from a stat"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "stare decisis cannot shield a decision that was constitutionally infirm from the"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "the framers intended to end racial caste \u2014 their intent is the controlling princ"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "the psychological harm inflicted by segregation is indisting",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "stare decisis cannot shield a decision that was constitution",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "the framers intended to end racial caste \u2014 their intent is t",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "A4 \u2014 three deviations (all turns deviate)",
+      "group": "A_deviation_sweep",
+      "notes": "Maximum deviation. Expect highest creativity, lowest legal_soundness.",
+      "moves": [
+        "justice frankfurter, the harm here is not psychological in the narrow sense \u2014 it is civic. Segregation tells a child they are not a full citizen.",
+        "overruling plessy is not judicial activism \u2014 it is the court fulfilling the promise of the reconstruction amendments after ninety years of delay",
+        "the dc argument proves too much. If inconsistent practice at ratification fixed constitutional meaning, the amendment could never have abolished slavery either."
+      ],
+      "total_turns": 3,
+      "deviation_count": 2,
+      "deviation_per_turn": [
+        false,
+        true,
+        true
+      ],
+      "score": {
+        "legal_soundness": 74,
+        "strategic_effectiveness": 55,
+        "creativity": 84,
+        "overall": 71
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "justice frankfurter, the harm here is not psychological in the narrow sense \u2014 it"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "the dc argument proves too much. If inconsistent practice at ratification fixed "
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "the dc argument proves too much. If inconsistent practice at ratification fixed "
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "justice frankfurter, the harm here is not psychological in t",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "overruling plessy is not judicial activism \u2014 it is the court",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "the dc argument proves too much. If inconsistent practice at",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "B1 \u2014 one-word arguments",
+      "group": "B_argument_length",
+      "notes": "Stress-test: does the system handle minimal input without crashing?",
+      "moves": [
+        "Unconstitutional.",
+        "Overrule.",
+        "Equality."
+      ],
+      "total_turns": 3,
+      "deviation_count": 3,
+      "deviation_per_turn": [
+        true,
+        true,
+        true
+      ],
+      "score": {
+        "legal_soundness": 66,
+        "strategic_effectiveness": 55,
+        "creativity": 95,
+        "overall": 72
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Unconstitutional."
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "Equality."
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "Equality."
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Unconstitutional.",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Overrule.",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "Equality.",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "B2 \u2014 very long arguments (~150 words each)",
+      "group": "B_argument_length",
+      "notes": "Does turn-log truncation and key moment preview look right at scale?",
+      "moves": [
+        "The Fourteenth Amendment's equal protection clause was ratified in 1868 with a singular purpose: to dismantle the legal architecture of racial hierarchy that had defined American law since the founding. When a state maintains two parallel school systems \u2014 one for white children and one for Black children \u2014 it is not making a neutral administrative choice. It is encoding a message of subordination into the law itself. The psychological evidence confirms what common sense already knows: children who attend segregated schools understand, from the very fact of segregation, that their government regards them as inferior. That is not education. That is state-sponsored stigma.",
+        "Plessy v. Ferguson was decided in 1896 by a court that was either unwilling or unable to see what the Fourteenth Amendment plainly required. The separate but equal doctrine was not a faithful reading of the Constitution \u2014 it was a capitulation to the politics of the Reconstruction's collapse. This Court has corrected its own errors before and has the full authority \u2014 indeed the obligation \u2014 to do so again. The question is not whether Plessy can be defended on its own terms. It cannot. The question is whether this Court will continue to let a defective precedent govern the lives of millions of American schoolchildren.",
+        "The argument from the District of Columbia proves far too much. It assumes that congressional practice at the moment of ratification defines the outer limit of a constitutional guarantee. But that cannot be right. If post-enactment legislative behavior controls, then no constitutional provision could ever be applied more broadly than it was on the day of its passage \u2014 which would make constitutional interpretation impossible and constitutional growth unthinkable. The Fourteenth Amendment was written as a permanent guarantee of equality before the law. The fact that Congress fell short of that guarantee in its own backyard does not diminish the guarantee \u2014 it underscores how urgently this Court must enforce it."
+      ],
+      "total_turns": 3,
+      "deviation_count": 1,
+      "deviation_per_turn": [
+        false,
+        false,
+        true
+      ],
+      "score": {
+        "legal_soundness": 82,
+        "strategic_effectiveness": 75,
+        "creativity": 72,
+        "overall": 76
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "The Fourteenth Amendment's equal protection clause was ratified in 1868 with a s"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "The argument from the District of Columbia proves far too much. It assumes that "
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The argument from the District of Columbia proves far too much. It assumes that "
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "The Fourteenth Amendment's equal protection clause was ratif",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Plessy v. Ferguson was decided in 1896 by a court that was e",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The argument from the District of Columbia proves far too mu",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "B3 \u2014 escalating length (short \u2192 medium \u2192 long)",
+      "group": "B_argument_length",
+      "notes": "Does the prototype handle variable-length moves cleanly?",
+      "moves": [
+        "Any racial classification maintained by a state violates the Fourteenth Amendment.",
+        "Plessy was wrongly decided. The separate but equal doctrine has no basis in the equal protection clause and this Court should say so explicitly today.",
+        "The DC schools argument misunderstands the relationship between legislative practice and constitutional meaning. The Fourteenth Amendment created a floor of equality that Congress itself was obligated to honor \u2014 and when Congress fell short, that failure was a constitutional violation, not a definition of the Amendment's scope. The framers intended to abolish racial caste; they did not intend to grandfather in every practice that happened to exist in 1868."
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Any racial classification maintained by a state violates the Fourteenth Amendmen"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The DC schools argument misunderstands the relationship between legislative prac"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Any racial classification maintained by a state violates the",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Plessy was wrongly decided. The separate but equal doctrine ",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The DC schools argument misunderstands the relationship betw",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "C1 \u2014 concede then pivot (strong strategic move)",
+      "group": "C_argument_quality",
+      "notes": "Tests whether conceding a point to gain credibility reads as deviation.",
+      "moves": [
+        "Justice Frankfurter, you are right that psychological harm alone may not be sufficient. But segregation is not before this Court merely because it causes harm \u2014 it is before this Court because it is a classification by race, and the Fourteenth Amendment makes all such classifications constitutionally suspect.",
+        "I will grant that Plessy has been on the books for fifty-six years. But plessy was wrongly decided, and longevity does not cure a constitutional error. This Court corrected Lochner. It can correct Plessy.",
+        "The DC schools point is a fair one. But the framers intended the amendment to be a living guarantee of equality, not a snapshot of 1868 congressional practice."
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Justice Frankfurter, you are right that psychological harm alone may not be suff"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The DC schools point is a fair one. But the framers intended the amendment to be"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Justice Frankfurter, you are right that psychological harm a",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "I will grant that Plessy has been on the books for fifty-six",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The DC schools point is a fair one. But the framers intended",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "C2 \u2014 question the question (redirect strategy)",
+      "group": "C_argument_quality",
+      "notes": "Does the prototype handle answers that reframe rather than respond directly?",
+      "moves": [
+        "The question is not whether every racial classification is per se unconstitutional \u2014 the question is whether this one is. And the answer is plainly yes, because its only purpose and its only effect is to mark Black children as unfit to share a schoolroom with white children.",
+        "The question is not what authority this Court has to overrule Plessy \u2014 the question is whether this Court has the authority to continue enforcing it. And I submit it does not.",
+        "The question is not what Congress did in DC in 1868 \u2014 the question is what the Fourteenth Amendment requires of every state government today. And the answer is equality."
+      ],
+      "total_turns": 3,
+      "deviation_count": 2,
+      "deviation_per_turn": [
+        false,
+        true,
+        true
+      ],
+      "score": {
+        "legal_soundness": 74,
+        "strategic_effectiveness": 55,
+        "creativity": 84,
+        "overall": 71
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "The question is not whether every racial classification is per se unconstitution"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "The question is not what Congress did in DC in 1868 \u2014 the question is what the F"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The question is not what Congress did in DC in 1868 \u2014 the question is what the F"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "The question is not whether every racial classification is p",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "The question is not what authority this Court has to overrul",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The question is not what Congress did in DC in 1868 \u2014 the qu",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "C3 \u2014 factually wrong arguments",
+      "group": "C_argument_quality",
+      "notes": "Wrong case citations, invented doctrines. Does the evaluator catch errors?",
+      "moves": [
+        "The Fifth Amendment's due process clause explicitly prohibits racial segregation in public schools \u2014 this Court held as much in Marbury v. Madison.",
+        "Plessy v. Ferguson was decided in 1920 and has been widely criticized by every subsequent court. The Brown precedent itself supports our position.",
+        "The framers of the Fourteenth Amendment specifically debated school segregation in the congressional record and voted to prohibit it by a margin of thirty to two."
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "The Fifth Amendment's due process clause explicitly prohibits racial segregation"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The framers of the Fourteenth Amendment specifically debated school segregation "
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "The Fifth Amendment's due process clause explicitly prohibit",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Plessy v. Ferguson was decided in 1920 and has been widely c",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The framers of the Fourteenth Amendment specifically debated",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "C4 \u2014 emotional appeals with no legal doctrine",
+      "group": "C_argument_quality",
+      "notes": "Pure pathos, no logos. How does scoring respond to legally hollow but compelling arguments?",
+      "moves": [
+        "These are children. They go to school every morning knowing that their government has decided they are not good enough to sit beside a white child. No legal doctrine should protect that.",
+        "Thurgood Marshall has spent his career watching Black Americans denied the education that would let them compete as equals. This Court has the power to end that today. The question is whether it will.",
+        "History is watching. The children of this generation will judge this Court not by its adherence to Plessy but by whether it had the courage to read the Constitution as it was written."
+      ],
+      "total_turns": 3,
+      "deviation_count": 2,
+      "deviation_per_turn": [
+        true,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 74,
+        "strategic_effectiveness": 55,
+        "creativity": 84,
+        "overall": 71
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "These are children. They go to school every morning knowing that their governmen"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "Thurgood Marshall has spent his career watching Black Americans denied the educa"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "History is watching. The children of this generation will judge this Court not b"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "These are children. They go to school every morning knowing ",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Thurgood Marshall has spent his career watching Black Americ",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "History is watching. The children of this generation will ju",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "C5 \u2014 pure jargon, no substance",
+      "group": "C_argument_quality",
+      "notes": "Sounds like a lawyer but says nothing. Does the detector flag this as deviation?",
+      "moves": [
+        "Under strict scrutiny analysis, the state bears the burden of demonstrating a compelling governmental interest and that its chosen means are narrowly tailored thereto, which burden it cannot meet.",
+        "The doctrine of stare decisis, while a cornerstone of jurisprudential stability, must yield to the constitutional imperative of the equal protection clause as construed pursuant to its original public meaning at the time of ratification.",
+        "The historical record adduced by respondent is unavailing inasmuch as contemporaneous legislative practice cannot be dispositive of constitutional meaning where such practice is itself constitutionally infirm."
+      ],
+      "total_turns": 3,
+      "deviation_count": 3,
+      "deviation_per_turn": [
+        true,
+        true,
+        true
+      ],
+      "score": {
+        "legal_soundness": 66,
+        "strategic_effectiveness": 55,
+        "creativity": 95,
+        "overall": 72
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Under strict scrutiny analysis, the state bears the burden of demonstrating a co"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "The historical record adduced by respondent is unavailing inasmuch as contempora"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The historical record adduced by respondent is unavailing inasmuch as contempora"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Under strict scrutiny analysis, the state bears the burden o",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "The doctrine of stare decisis, while a cornerstone of jurisp",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The historical record adduced by respondent is unavailing in",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "D1 \u2014 deferential tone (over-polite)",
+      "group": "D_tone",
+      "notes": "Does excessive deference affect scoring? Should it?",
+      "moves": [
+        "With the greatest respect to the Court and to the question posed, I would submit, if it please the Court, that the Fourteenth Amendment was designed to eliminate racial classifications of exactly this kind.",
+        "Your Honor raises a most important question, and I am grateful for it. If I may, I would simply note that Plessy was wrongly decided, though I recognize that conclusion is one the Court must reach on its own terms.",
+        "I take the Court's point about the DC schools seriously, and I do not wish to be dismissive of it. But I would gently suggest that the framers' intent was broader than any single practice at the time of ratification."
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "With the greatest respect to the Court and to the question posed, I would submit"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "I take the Court's point about the DC schools seriously, and I do not wish to be"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "With the greatest respect to the Court and to the question p",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Your Honor raises a most important question, and I am gratef",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "I take the Court's point about the DC schools seriously, and",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "D2 \u2014 confrontational tone",
+      "group": "D_tone",
+      "notes": "Aggressive posture. Does tone affect scoring in the mock?",
+      "moves": [
+        "Any state that maintains segregated schools is violating the Constitution, full stop. There is no other reading of the Fourteenth Amendment that survives honest scrutiny.",
+        "Plessy is indefensible. It was wrong in 1896 and it is wrong today. This Court should not waste another sentence defending it.",
+        "The DC argument is a red herring and I won't dignify it with more than this: unconstitutional practice at ratification does not launder itself into constitutional permission."
+      ],
+      "total_turns": 3,
+      "deviation_count": 2,
+      "deviation_per_turn": [
+        true,
+        false,
+        true
+      ],
+      "score": {
+        "legal_soundness": 74,
+        "strategic_effectiveness": 55,
+        "creativity": 84,
+        "overall": 71
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Any state that maintains segregated schools is violating the Constitution, full "
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "The DC argument is a red herring and I won't dignify it with more than this: unc"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The DC argument is a red herring and I won't dignify it with more than this: unc"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Any state that maintains segregated schools is violating the",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Plessy is indefensible. It was wrong in 1896 and it is wrong",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The DC argument is a red herring and I won't dignify it with",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "D3 \u2014 Socratic/question-heavy",
+      "group": "D_tone",
+      "notes": "Responding to questions with questions. Real lawyers do this. How does the prototype handle it?",
+      "moves": [
+        "May I ask the Court to consider: if a state law said explicitly that Black children may not attend white schools, would there be any doubt that it violates the Fourteenth Amendment? And if not, why does it matter that the state has arranged the same outcome through separate facilities?",
+        "What would it mean to follow Plessy faithfully? It would mean telling millions of Black schoolchildren that the Constitution permits their government to mark them as inferior. Is that really what this Court intends?",
+        "If congressional practice at ratification defines the Amendment's scope, then what work does the Amendment do at all? Would it not have been simpler to simply codify the status quo?"
+      ],
+      "total_turns": 3,
+      "deviation_count": 1,
+      "deviation_per_turn": [
+        false,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 82,
+        "strategic_effectiveness": 75,
+        "creativity": 72,
+        "overall": 76
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "May I ask the Court to consider: if a state law said explicitly that Black child"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "What would it mean to follow Plessy faithfully? It would mean telling millions o"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "If congressional practice at ratification defines the Amendment's scope, then wh"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "May I ask the Court to consider: if a state law said explici",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "What would it mean to follow Plessy faithfully? It would mea",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "If congressional practice at ratification defines the Amendm",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "E1 \u2014 repeat same argument all three turns",
+      "group": "E_edge_cases",
+      "notes": "Does the evaluator catch repetition? Does deviation detection behave consistently?",
+      "moves": [
+        "Racial segregation in public schools violates the Fourteenth Amendment's equal protection clause.",
+        "Racial segregation in public schools violates the Fourteenth Amendment's equal protection clause.",
+        "Racial segregation in public schools violates the Fourteenth Amendment's equal protection clause."
+      ],
+      "total_turns": 3,
+      "deviation_count": 1,
+      "deviation_per_turn": [
+        false,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 82,
+        "strategic_effectiveness": 75,
+        "creativity": 72,
+        "overall": 76
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Racial segregation in public schools violates the Fourteenth Amendment's equal p"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "Racial segregation in public schools violates the Fourteenth Amendment's equal p"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "Racial segregation in public schools violates the Fourteenth Amendment's equal p"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Racial segregation in public schools violates the Fourteenth",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Racial segregation in public schools violates the Fourteenth",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "Racial segregation in public schools violates the Fourteenth",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "E2 \u2014 wrong area of law entirely",
+      "group": "E_edge_cases",
+      "notes": "Argues contract law. Maximum deviation expected. Does scoring still produce output?",
+      "moves": [
+        "Under the common law of contracts, the state's obligation to provide schooling constitutes an offer that all children may accept, and denying that offer on racial grounds constitutes a breach.",
+        "The consideration for a child's attendance at a public school is their status as a citizen of the state. Denying that consideration based on race renders the contract void for unconscionability.",
+        "Specific performance is the appropriate remedy \u2014 the Court should order the state to perform its contractual obligation to admit all students on equal terms."
+      ],
+      "total_turns": 3,
+      "deviation_count": 1,
+      "deviation_per_turn": [
+        false,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 82,
+        "strategic_effectiveness": 75,
+        "creativity": 72,
+        "overall": 76
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Under the common law of contracts, the state's obligation to provide schooling c"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "The consideration for a child's attendance at a public school is their status as"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "Specific performance is the appropriate remedy \u2014 the Court should order the stat"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Under the common law of contracts, the state's obligation to",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "The consideration for a child's attendance at a public schoo",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "Specific performance is the appropriate remedy \u2014 the Court s",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "E3 \u2014 argue for the other side",
+      "group": "E_edge_cases",
+      "notes": "User explicitly defends segregation. Does the system break, score oddly, or handle gracefully?",
+      "moves": [
+        "Plessy was correctly decided. Separate but equal is a permissible accommodation of social difference and the states retain authority to organize their own school systems.",
+        "This Court should defer to the democratic choices of the states. If the people of Kansas wish to maintain separate schools, the Fourteenth Amendment does not prohibit it.",
+        "The DC schools argument is dispositive. The Congress that ratified the Fourteenth Amendment continued to fund segregated schools in DC \u2014 proof that they did not intend to prohibit state-maintained segregation."
+      ],
+      "total_turns": 3,
+      "deviation_count": 2,
+      "deviation_per_turn": [
+        true,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 74,
+        "strategic_effectiveness": 55,
+        "creativity": 84,
+        "overall": 71
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Plessy was correctly decided. Separate but equal is a permissible accommodation "
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "This Court should defer to the democratic choices of the states. If the people o"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The DC schools argument is dispositive. The Congress that ratified the Fourteent"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Plessy was correctly decided. Separate but equal is a permis",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "This Court should defer to the democratic choices of the sta",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The DC schools argument is dispositive. The Congress that ra",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "E4 \u2014 non-English argument",
+      "group": "E_edge_cases",
+      "notes": "Spanish argument. Zero keyword overlap guaranteed. Does system handle gracefully?",
+      "moves": [
+        "La segregaci\u00f3n racial en las escuelas p\u00fablicas viola la Decimocuarta Enmienda de la Constituci\u00f3n de los Estados Unidos.",
+        "Plessy contra Ferguson fue decidido incorrectamente y debe ser revocado por este tribunal.",
+        "Los fundadores de la Decimocuarta Enmienda ten\u00edan la intenci\u00f3n de abolir el sistema de castas racial en todas sus formas."
+      ],
+      "total_turns": 3,
+      "deviation_count": 3,
+      "deviation_per_turn": [
+        true,
+        true,
+        true
+      ],
+      "score": {
+        "legal_soundness": 66,
+        "strategic_effectiveness": 55,
+        "creativity": 95,
+        "overall": 72
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "La segregaci\u00f3n racial en las escuelas p\u00fablicas viola la Decimocuarta Enmienda de"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "Los fundadores de la Decimocuarta Enmienda ten\u00edan la intenci\u00f3n de abolir el sist"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "Los fundadores de la Decimocuarta Enmienda ten\u00edan la intenci\u00f3n de abolir el sist"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "La segregaci\u00f3n racial en las escuelas p\u00fablicas viola la Deci",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Plessy contra Ferguson fue decidido incorrectamente y debe s",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "Los fundadores de la Decimocuarta Enmienda ten\u00edan la intenci",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "E5 \u2014 single-character / empty-ish arguments",
+      "group": "E_edge_cases",
+      "notes": "Minimum viable input. Does the state machine survive?",
+      "moves": [
+        "...",
+        "?",
+        "No."
+      ],
+      "total_turns": 3,
+      "deviation_count": 3,
+      "deviation_per_turn": [
+        true,
+        true,
+        true
+      ],
+      "score": {
+        "legal_soundness": 66,
+        "strategic_effectiveness": 55,
+        "creativity": 95,
+        "overall": 72
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "..."
+        },
+        {
+          "label": "deviation_point",
+          "turn": 6,
+          "user_text_preview": "No."
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "No."
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "...",
+          "detected_as_deviation": true,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "?",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "No.",
+          "detected_as_deviation": true,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "F1 \u2014 cite social science evidence (what Marshall actually did)",
+      "group": "F_realistic",
+      "notes": "References Kenneth Clark doll studies. Historically grounded deviation.",
+      "moves": [
+        "The evidence before this Court includes the work of Dr. Kenneth Clark, whose studies show that Black children in segregated schools internalize a sense of inferiority. That is not conjecture \u2014 it is documented psychological harm caused directly by state action.",
+        "This Court has previously held that separate facilities are inherently unequal in the context of graduate education \u2014 McLaurin and Sweatt. The principle does not stop at graduate school. It applies wherever the state segregates.",
+        "The DC argument only reinforces our position: if Congress itself violated the Fourteenth Amendment by funding segregated schools, this Court should say so \u2014 and say so clearly \u2014 rather than use that violation to justify more of the same."
+      ],
+      "total_turns": 3,
+      "deviation_count": 1,
+      "deviation_per_turn": [
+        false,
+        true,
+        false
+      ],
+      "score": {
+        "legal_soundness": 82,
+        "strategic_effectiveness": 75,
+        "creativity": 72,
+        "overall": 76
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "The evidence before this Court includes the work of Dr. Kenneth Clark, whose stu"
+        },
+        {
+          "label": "deviation_point",
+          "turn": 4,
+          "user_text_preview": "This Court has previously held that separate facilities are inherently unequal i"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The DC argument only reinforces our position: if Congress itself violated the Fo"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "The evidence before this Court includes the work of Dr. Kenn",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "This Court has previously held that separate facilities are ",
+          "detected_as_deviation": true,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The DC argument only reinforces our position: if Congress it",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "F2 \u2014 build incrementally, turn by turn",
+      "group": "F_realistic",
+      "notes": "Each move builds on the previous one, as a good oral argument should.",
+      "moves": [
+        "The Fourteenth Amendment prohibits racial classifications by the state. Segregated schools are a racial classification. Therefore they are prohibited.",
+        "Plessy tried to escape that logic by inventing the fiction of separate but equal. But the fiction was always a lie \u2014 separate has never been equal \u2014 and it is time for this Court to say so.",
+        "And as for DC: if the Congress that ratified the Amendment violated it, that makes their violation a constitutional wrong, not a constitutional permission. The Amendment's text controls, not the practice of those who failed to live up to it."
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "The Fourteenth Amendment prohibits racial classifications by the state. Segregat"
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "And as for DC: if the Congress that ratified the Amendment violated it, that mak"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "The Fourteenth Amendment prohibits racial classifications by",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Plessy tried to escape that logic by inventing the fiction o",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "And as for DC: if the Congress that ratified the Amendment v",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    },
+    {
+      "label": "F3 \u2014 strong close, weak open",
+      "group": "F_realistic",
+      "notes": "Deliberately weak first move, strong finish. Does key moment tagging reflect this?",
+      "moves": [
+        "Segregation is bad and the Constitution says so.",
+        "Well, Plessy was a mistake and we think you should fix it because the equal protection clause does not permit this kind of treatment of people.",
+        "The framers intended the Fourteenth Amendment to be a guarantee of equal citizenship in perpetuity \u2014 not a baseline frozen at the practices of 1868. The DC schools were an inconsistency, not a definition. This Court should enforce the amendment as written and hold that racially segregated public schools are unconstitutional."
+      ],
+      "total_turns": 3,
+      "deviation_count": 0,
+      "deviation_per_turn": [
+        false,
+        false,
+        false
+      ],
+      "score": {
+        "legal_soundness": 90,
+        "strategic_effectiveness": 75,
+        "creativity": 60,
+        "overall": 75
+      },
+      "key_moments": [
+        {
+          "label": "best_move",
+          "turn": 2,
+          "user_text_preview": "Segregation is bad and the Constitution says so."
+        },
+        {
+          "label": "worst_move",
+          "turn": 6,
+          "user_text_preview": "The framers intended the Fourteenth Amendment to be a guarantee of equal citizen"
+        }
+      ],
+      "final_state": "SCORED",
+      "deviation_detection": [
+        {
+          "move_index": 0,
+          "text_preview": "Segregation is bad and the Constitution says so.",
+          "detected_as_deviation": false,
+          "historical_reference": "the constitution does not permit racial classification"
+        },
+        {
+          "move_index": 1,
+          "text_preview": "Well, Plessy was a mistake and we think you should fix it be",
+          "detected_as_deviation": false,
+          "historical_reference": "plessy was wrongly decided"
+        },
+        {
+          "move_index": 2,
+          "text_preview": "The framers intended the Fourteenth Amendment to be a guaran",
+          "detected_as_deviation": false,
+          "historical_reference": "the framers intended to end racial caste"
+        }
+      ]
+    }
+  ]
+}

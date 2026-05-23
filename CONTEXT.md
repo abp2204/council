@@ -1,4 +1,4 @@
-# COUNSIL — Domain Glossary
+# COUNCIL — Domain Glossary
 
 ## Case
 A single bounded legal proceeding drawn from one source transcript — e.g., one oral argument, one cross-examination, one closing argument. It is the atomic unit of the product: the thing a user "plays." Cases can later be chained into multi-proceeding arcs, but the Case itself has a defined start state, a set of available arguments, and a known historical outcome.
@@ -28,7 +28,7 @@ A separate AI role — distinct from the Opposing Role — that produces the end
 A user-selected setting that controls the intensity of the Opposing Role. Not in MVP — all Cases launch at authentic historical intensity. Planned feature: explicit tiers (e.g., Easy / Medium / Hard), where Hard is the historically-grounded Profile at full intensity.
 
 ## Case Library
-The platform-curated collection of published Cases. All Cases in MVP are created and maintained by the COUNSIL team. User- or org-uploaded Cases are not supported in MVP but are a planned enterprise tier.
+The platform-curated collection of published Cases. All Cases in MVP are created and maintained by the COUNCIL team. User- or org-uploaded Cases are not supported in MVP but are a planned enterprise tier.
 
 ## Cohort
 An org-scoped group of users (e.g., associates at a law firm, students in a class) with a private shared leaderboard. A Cohort belongs to an enterprise account. Scores within a Cohort are visible to Cohort members only.
