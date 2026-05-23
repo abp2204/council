@@ -14,6 +14,8 @@ from textwrap import dedent, fill
 import sys
 import os
 
+from session_store import save_session, format_history_summary
+
 # ── State Machine ──────────────────────────────────────────────────────────────
 
 class State(Enum):
@@ -288,7 +290,11 @@ def cmd_move(s: SessionState, text: str):
 
 
 def cmd_score(s: SessionState):
-    if s.state not in (State.SESSION_END, State.SCORED):
+    if s.state == State.SCORED:
+        # Already scored — just reprint; don't re-evaluate or re-save.
+        print_score(s.score)
+        return
+    if s.state != State.SESSION_END:
         print(f"  Session not ended yet (state: {s.state.name}). Keep arguing.")
         return
     s.state = State.EVALUATING
@@ -298,6 +304,15 @@ def cmd_score(s: SessionState):
     s.score = result
     s.state = State.SCORED
     print_score(s.score)
+    try:
+        path = save_session(s)
+        print(f"  [ Session saved → {path} ]")
+        summary = format_history_summary(s.case_id)
+        if summary:
+            print()
+            print(summary)
+    except OSError as e:
+        print(f"  [ Warning: could not save session — {e} ]")
 
 
 def cmd_review(s: SessionState, index: int):
