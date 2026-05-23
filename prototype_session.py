@@ -15,7 +15,7 @@ import sys
 import os
 
 from opposing_role import OpposingRole, MockOpposingRole
-from case_library import load_case, list_cases
+from case_library import load_case, list_cases, DraftCaseError
 from session_store import save_session, format_history_summary
 
 # ── State Machine ──────────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ def print_review(moment: KeyMoment):
 def cmd_start(s: SessionState, case_id: str):
     try:
         case = load_case(case_id)
-    except KeyError as exc:
+    except (KeyError, DraftCaseError) as exc:
         print(f"  {exc}")
         return
     s.case_id = case_id

@@ -33,7 +33,7 @@ class MockOpposingRole:
     """
 
     def __init__(self, case_id: str) -> None:
-        case = load_case(case_id)
+        case = load_case(case_id, operator=True)
         opp = case["opposing_role"]
         self._mock_probes: list[str] = opp["mock_probes"]
         self._mock_close: str = opp["mock_close"]
@@ -121,7 +121,7 @@ class OpposingRole:
     MODEL = "llama-3.3-70b-versatile"
 
     def __init__(self, case_id: str, model: str | None = None) -> None:
-        case = load_case(case_id)
+        case = load_case(case_id, operator=True)
         self._profile = case["opposing_role"]
         self._model = model or self.MODEL
         api_key = os.environ.get("GROQ_API_KEY")

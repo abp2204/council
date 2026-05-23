@@ -30,6 +30,9 @@ A user-selected setting that controls the intensity of the Opposing Role. Not in
 ## Case Library
 The platform-curated collection of published Cases. All Cases in MVP are created and maintained by the COUNCIL team. User- or org-uploaded Cases are not supported in MVP but are a planned enterprise tier.
 
+## Operator
+A member of the COUNCIL team with access to the case authoring pipeline. Operators create and publish Cases using the ingestion pipeline — they are not Users. In MVP, only Operators can add Cases to the Case Library.
+
 ## Cohort
 An org-scoped group of users (e.g., associates at a law firm, students in a class) with a private shared leaderboard. A Cohort belongs to an enterprise account. Scores within a Cohort are visible to Cohort members only.
 
