@@ -29,7 +29,7 @@ def save_session(s) -> Path:
     case_dir = SESSIONS_DIR / s.case_id
     case_dir.mkdir(exist_ok=True)
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     path = case_dir / f"{ts}.json"
 
     key_moments = [
