@@ -15,8 +15,8 @@ from prototype_session import (
     SessionState, State, KeyMoment,
     cmd_start, cmd_move, cmd_score,
     detect_deviation, evaluate_session,
-    HISTORICAL_MOVES, OPPONENT_SCRIPT,
 )
+from case_library import load_case
 
 
 @contextlib.contextmanager
@@ -32,8 +32,10 @@ def silent():
 
 def run_session(label: str, moves: list[str], group: str, notes: str = "") -> dict:
     s = SessionState()
+    case_id = "brown"
+    historical_record = load_case(case_id).get("historical_record", [])
     with silent():
-        cmd_start(s, "brown")
+        cmd_start(s, case_id)
 
     for move in moves:
         if s.state != State.IN_SESSION:
@@ -83,7 +85,7 @@ def run_session(label: str, moves: list[str], group: str, notes: str = "") -> di
                 "move_index": i,
                 "text_preview": moves[i][:60] if i < len(moves) else "",
                 "detected_as_deviation": deviation_flags[i] if i < len(deviation_flags) else None,
-                "historical_reference": HISTORICAL_MOVES[i] if i < len(HISTORICAL_MOVES) else None,
+                "historical_reference": historical_record[i] if i < len(historical_record) else None,
             }
             for i in range(len(moves))
         ],

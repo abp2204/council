@@ -14,6 +14,9 @@ from textwrap import dedent, fill
 import sys
 import os
 
+from opposing_role import OpposingRole, MockOpposingRole
+from case_library import load_case, list_cases
+
 # ── State Machine ──────────────────────────────────────────────────────────────
 
 class State(Enum):
@@ -42,57 +45,16 @@ class SessionState:
     deviation_count: int = 0
     key_moments: list[KeyMoment] = field(default_factory=list)
     score: dict = field(default_factory=dict)         # filled at SCORED
+    case: dict = field(default_factory=dict)
     reviewing_moment: int | None = None               # index into key_moments
+    opposing_role: object = field(default=None)
 
 
-# ── Mock Data ──────────────────────────────────────────────────────────────────
-
-CASES = {
-    "brown": {
-        "title": "Brown v. Board of Education (1952 Oral Argument)",
-        "opposing_role": "Justice Felix Frankfurter",
-        "user_role": "Thurgood Marshall (NAACP)",
-        "context": "You are arguing before the Supreme Court that segregated public schools violate the Equal Protection Clause of the 14th Amendment.",
-        "historical_opening": "The Fourteenth Amendment prohibits a state from maintaining a dual school system based solely on race.",
-    }
-}
-
-# Scripted opponent turns — in a real build these come from a Profile-backed LLM
-OPPONENT_SCRIPT = [
-    {
-        "text": "Mr. Marshall, suppose we agree that segregation causes psychological harm — does that mean *any* state classification by race is per se unconstitutional, or only this one?",
-        "closes": False,
-        "expects_keyword": None,
-    },
-    {
-        "text": "But Plessy v. Ferguson is on the books. You're asking us to overrule a 56-year-old precedent. On what authority do we do that short of a constitutional amendment?",
-        "closes": False,
-        "expects_keyword": "plessy",
-    },
-    {
-        "text": "You're telling me the intent of the Framers of the Fourteenth Amendment was to desegregate public schools — but the Congress that ratified the amendment also funded segregated schools in the District of Columbia. How do you reconcile that?",
-        "closes": False,
-        "expects_keyword": None,
-    },
-    {
-        "text": "Mr. Marshall, I think you've given us a great deal to consider. We'll hear from the other side. The Court thanks you.",
-        "closes": True,
-        "expects_keyword": None,
-    },
-]
-
-# Mock historical path (what Thurgood actually said, simplified)
-HISTORICAL_MOVES = [
-    "the constitution does not permit racial classification",
-    "plessy was wrongly decided",
-    "the framers intended to end racial caste",
-]
-
-def detect_deviation(user_text: str, turn_index: int) -> bool:
+def detect_deviation(user_text: str, turn_index: int, historical_record: list) -> bool:
     """True if user's move diverges from the historical path."""
-    if turn_index >= len(HISTORICAL_MOVES):
+    if turn_index >= len(historical_record):
         return False
-    historical = HISTORICAL_MOVES[turn_index]
+    historical = historical_record[turn_index]
     # Naive keyword overlap check — real version uses embeddings
     user_words = set(user_text.lower().split())
     hist_words = set(historical.lower().split())
@@ -220,10 +182,13 @@ def print_review(moment: KeyMoment):
 # ── Command Dispatch ───────────────────────────────────────────────────────────
 
 def cmd_start(s: SessionState, case_id: str):
-    if case_id not in CASES:
-        print(f"  Unknown case. Available: {', '.join(CASES.keys())}")
+    try:
+        case = load_case(case_id)
+    except KeyError as exc:
+        print(f"  {exc}")
         return
     s.case_id = case_id
+    s.case = case
     s.session_id += 1
     s.turns = []
     s.deviation_count = 0
@@ -231,18 +196,27 @@ def cmd_start(s: SessionState, case_id: str):
     s.score = {}
     s.reviewing_moment = None
     s.state = State.IN_SESSION
-    case = CASES[case_id]
     print()
     hr("═")
     print(f"  CASE: {case['title']}")
     print(f"  You are: {case['user_role']}")
-    print(f"  Opposing: {case['opposing_role']}")
+    print(f"  Opposing: {case['opposing_role']['name']}")
     hr()
-    wrap(case["context"], indent=2)
+    wrap(case["user_role_context"], indent=2)
     hr("═")
     print()
-    # First opponent line
-    first = OPPONENT_SCRIPT[0]["text"]
+    if s.opposing_role is None:
+        if os.environ.get("GROQ_API_KEY"):
+            try:
+                s.opposing_role = OpposingRole(case_id)
+            except Exception as exc:
+                print(f"  [WARNING] Groq API unavailable ({exc}). Falling back to mock.")
+                s.opposing_role = MockOpposingRole(case_id)
+        else:
+            print("  [ No GROQ_API_KEY — running with offline mock opponent ]")
+            s.opposing_role = MockOpposingRole(case_id)
+    print("  [ Opposing Role initializing… ]")
+    first, _ = s.opposing_role.respond([])
     s.turns.append({"role": "opponent", "text": first})
     print("  [OPPONENT]")
     wrap(first, indent=4)
@@ -255,7 +229,7 @@ def cmd_move(s: SessionState, text: str):
         return
 
     turn_index = len([t for t in s.turns if t["role"] == "user"])
-    deviation = detect_deviation(text, turn_index)
+    deviation = detect_deviation(text, turn_index, s.case.get("historical_record", []))
     if deviation:
         s.deviation_count += 1
 
@@ -266,24 +240,14 @@ def cmd_move(s: SessionState, text: str):
     else:
         print("  (( following historical playbook ))")
 
-    # Pick next opponent line
-    opponent_turn_index = len([t for t in s.turns if t["role"] == "opponent"])
-    if opponent_turn_index < len(OPPONENT_SCRIPT):
-        opp = OPPONENT_SCRIPT[opponent_turn_index]
-        s.turns.append({"role": "opponent", "text": opp["text"]})
-        print()
-        print("  [OPPONENT]")
-        wrap(opp["text"], indent=4)
-        print()
-        if opp["closes"]:
-            s.state = State.SESSION_END
-            print("  — Session closing. Type 'score' to evaluate. —")
-    else:
+    opp_text, closes = s.opposing_role.respond(s.turns)
+    s.turns.append({"role": "opponent", "text": opp_text})
+    print()
+    print("  [OPPONENT]")
+    wrap(opp_text, indent=4)
+    print()
+    if closes:
         s.state = State.SESSION_END
-        print()
-        print("  [OPPONENT] The Court thanks you. We'll take the matter under advisement.")
-        s.turns.append({"role": "opponent", "text": "The Court thanks you. We'll take the matter under advisement."})
-        print()
         print("  — Session closing. Type 'score' to evaluate. —")
 
 
@@ -319,7 +283,7 @@ def cmd_back(s: SessionState):
         return
     s.state = State.SCORED
     print()
-    print("  Back to scorecard. Type 'review N' to expand another moment, or 'start brown' to replay.")
+    print("  Back to scorecard. Type 'review N' to expand another moment, or 'start <case>' to replay.")
     print_score(s.score)
 
 
@@ -332,12 +296,26 @@ def cmd_replay(s: SessionState):
     cmd_start(s, case_id)
 
 
+def cmd_cases():
+    cases = list_cases()
+    print()
+    hr()
+    print("  AVAILABLE CASES")
+    hr()
+    for c in cases:
+        print(f"  {c['id']:<12} {c['title']}")
+        print(f"               {c['proceeding_type']}  ·  {c['practice_area']}")
+    hr()
+    print()
+
+
 def print_help():
     print()
     hr()
     print("  COMMANDS")
     hr()
-    print("  start <case>     — begin a session (case: 'brown')")
+    print("  start <case>     — begin a session (type 'cases' to list)")
+    print("  cases            — list available cases")
     print("  > <text>         — submit your Move (argument)")
     print("  score            — evaluate the session (after it ends)")
     print("  review <N>       — expand key moment N")
@@ -383,6 +361,8 @@ def repl():
             sys.exit(0)
         elif cmd == "help":
             print_help()
+        elif cmd == "cases":
+            cmd_cases()
         elif cmd == "start":
             cmd_start(s, arg or "brown")
         elif cmd == ">":
