@@ -9,14 +9,23 @@ prototype_test_results.json.
 import sys
 import io
 import json
+import os
+import time
 import contextlib
 from dataclasses import asdict
 from prototype_session import (
     SessionState, State, KeyMoment,
     cmd_start, cmd_move, cmd_score,
     detect_deviation, evaluate_session,
-    HISTORICAL_MOVES, OPPONENT_SCRIPT,
 )
+from opposing_role import OpposingRole, MockOpposingRole
+from case_library import load_case
+
+HISTORICAL_MOVES = load_case("brown", operator=True).get("historical_record", [])
+
+LIVE = bool(os.environ.get("GROQ_API_KEY"))
+# Use the fast/cheap model for batch test runs; swap to llama-3.3-70b-versatile for quality checks
+TEST_MODEL = os.environ.get("COUNCIL_TEST_MODEL", "llama-3.1-8b-instant")
 
 
 @contextlib.contextmanager
@@ -32,8 +41,9 @@ def silent():
 
 def run_session(label: str, moves: list[str], group: str, notes: str = "") -> dict:
     s = SessionState()
+    s.opposing_role = OpposingRole("brown", model=TEST_MODEL) if LIVE else MockOpposingRole("brown")
     with silent():
-        cmd_start(s, "brown")
+        cmd_start(s, "brown")  # sees pre-set opposing_role, won't override
 
     for move in moves:
         if s.state != State.IN_SESSION:
@@ -41,6 +51,9 @@ def run_session(label: str, moves: list[str], group: str, notes: str = "") -> di
         with silent():
             cmd_move(s, move)
 
+    # Force session end if still running (e.g. fewer than 3 moves submitted)
+    if s.state == State.IN_SESSION:
+        s.state = State.SESSION_END
     with silent():
         cmd_score(s)
 
@@ -332,6 +345,9 @@ TESTS = [
 
 
 def main():
+    mode = f"LIVE (Groq {TEST_MODEL})" if LIVE else "MOCK"
+    print(f"  Mode: {mode}")
+    print()
     results = []
     for i, test in enumerate(TESTS, 1):
         print(f"  Running {i:02d}/{len(TESTS)}: {test['label']}")
@@ -342,10 +358,11 @@ def main():
             notes=test.get("notes", ""),
         )
         results.append(result)
-
-    # Write raw results
-    with open("prototype_test_results.json", "w") as f:
-        json.dump(results, f, indent=2)
+        # Write incrementally so a rate-limit crash doesn't discard completed sessions
+        with open("prototype_test_results.json", "w") as f:
+            json.dump(results, f, indent=2)
+        if LIVE:
+            time.sleep(1)  # avoid Groq rate limits between sessions
 
     # Print summary table
     print()
@@ -366,10 +383,8 @@ def main():
 
     # ── Findings ──────────────────────────────────────────────────────────────
     findings = analyze(results)
-    with open("prototype_test_results.json", "r+") as f:
-        data = json.load(f)
     with open("prototype_test_results.json", "w") as f:
-        json.dump({"findings": findings, "sessions": data}, f, indent=2)
+        json.dump({"findings": findings, "sessions": results}, f, indent=2)
 
     print(f"Results written to prototype_test_results.json")
     print(f"  {len(results)} sessions | {sum(r['deviation_count'] for r in results)} total deviations")
