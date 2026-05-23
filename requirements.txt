@@ -1,4 +1,1 @@
-groq>=0.9.0
 anthropic>=0.40.0
-sounddevice>=0.4.0
-numpy>=1.24.0

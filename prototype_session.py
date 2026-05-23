@@ -15,27 +15,8 @@ import sys
 import os
 
 from opposing_role import OpposingRole, MockOpposingRole
-from session_store import save_session, format_history_summary
 from case_library import load_case, list_cases, DraftCaseError
-
-try:
-    from stt import record_and_transcribe, VOICE_AVAILABLE
-except ImportError:
-    VOICE_AVAILABLE = False
-    def record_and_transcribe() -> str: return ""
-
-# Oral register note injected into the Evaluator system prompt (ADR 0002).
-# Voice is the primary input modality; do not penalize natural spoken patterns.
-EVALUATOR_ORAL_REGISTER_NOTE = """\
-Arguments are submitted by voice (speech-to-text) — this is the primary input \
-modality. Treat the transcript as spoken advocacy, not a legal brief. Do not \
-penalize natural spoken patterns such as fillers ("uh", "you know"), \
-self-corrections ("I mean — what I mean to say is…"), or informal cadence. \
-Evaluate the substance: legal reasoning, strategic framing, and responsiveness \
-to the Opposing Role's challenges. Spoken fluency and written style are not \
-scoring dimensions.\
-"""
-
+from session_store import save_session, format_history_summary
 
 # ── State Machine ──────────────────────────────────────────────────────────────
 
@@ -65,12 +46,12 @@ class SessionState:
     deviation_count: int = 0
     key_moments: list[KeyMoment] = field(default_factory=list)
     score: dict = field(default_factory=dict)         # filled at SCORED
-    reviewing_moment: int | None = None               # index into key_moments
-    opposing_role: OpposingRole | MockOpposingRole | None = None
     case: dict = field(default_factory=dict)
+    reviewing_moment: int | None = None               # index into key_moments
+    opposing_role: object = field(default=None)
 
 
-def detect_deviation(user_text: str, turn_index: int, historical_record: list[str]) -> bool:
+def detect_deviation(user_text: str, turn_index: int, historical_record: list) -> bool:
     """True if user's move diverges from the historical path."""
     if turn_index >= len(historical_record):
         return False
@@ -204,14 +185,11 @@ def print_review(moment: KeyMoment):
 def cmd_start(s: SessionState, case_id: str):
     try:
         case = load_case(case_id)
-    except DraftCaseError as exc:
+    except (KeyError, DraftCaseError) as exc:
         print(f"  {exc}")
         return
-    except KeyError as exc:
-        print(f"  {exc}")
-        return
-    s.case = case
     s.case_id = case_id
+    s.case = case
     s.session_id += 1
     s.turns = []
     s.deviation_count = 0
@@ -226,8 +204,6 @@ def cmd_start(s: SessionState, case_id: str):
     print(f"  Opposing: {case['opposing_role']['name']}")
     hr()
     wrap(case["user_role_context"], indent=2)
-    print()
-    wrap(f"Historical opening: {case['historical_opening']}", indent=2)
     hr("═")
     print()
     if s.opposing_role is None:
@@ -265,11 +241,9 @@ def cmd_move(s: SessionState, text: str):
     else:
         print("  (( following historical playbook ))")
 
-    # Generative opponent response
-    print()
-    print("  [ Opposing Role responding… ]")
     opp_text, closes = s.opposing_role.respond(s.turns)
     s.turns.append({"role": "opponent", "text": opp_text})
+    print()
     print("  [OPPONENT]")
     wrap(opp_text, indent=4)
     print()
@@ -279,7 +253,11 @@ def cmd_move(s: SessionState, text: str):
 
 
 def cmd_score(s: SessionState):
-    if s.state not in (State.SESSION_END, State.SCORED):
+    if s.state == State.SCORED:
+        # Already scored — just reprint; don't re-evaluate or re-save.
+        print_score(s.score)
+        return
+    if s.state != State.SESSION_END:
         print(f"  Session not ended yet (state: {s.state.name}). Keep arguing.")
         return
     s.state = State.EVALUATING
@@ -289,12 +267,15 @@ def cmd_score(s: SessionState):
     s.score = result
     s.state = State.SCORED
     print_score(s.score)
-    path = save_session(s)
-    print(f"  [ Session saved → {path} ]")
-    summary = format_history_summary(s.case_id)
-    if summary:
-        print()
-        print(summary)
+    try:
+        path = save_session(s)
+        print(f"  [ Session saved → {path} ]")
+        summary = format_history_summary(s.case_id)
+        if summary:
+            print()
+            print(summary)
+    except OSError as e:
+        print(f"  [ Warning: could not save session — {e} ]")
 
 
 def cmd_review(s: SessionState, index: int):
@@ -316,7 +297,7 @@ def cmd_back(s: SessionState):
         return
     s.state = State.SCORED
     print()
-    print("  Back to scorecard. Type 'review N' to expand another moment, or 'start brown' to replay.")
+    print("  Back to scorecard. Type 'review N' to expand another moment, or 'start <case>' to replay.")
     print_score(s.score)
 
 
@@ -329,15 +310,27 @@ def cmd_replay(s: SessionState):
     cmd_start(s, case_id)
 
 
+def cmd_cases():
+    cases = list_cases()
+    print()
+    hr()
+    print("  AVAILABLE CASES")
+    hr()
+    for c in cases:
+        print(f"  {c['id']:<12} {c['title']}")
+        print(f"               {c['proceeding_type']}  ·  {c['practice_area']}")
+    hr()
+    print()
+
+
 def print_help():
-    voice_status = "available" if VOICE_AVAILABLE else "unavailable — install sounddevice numpy"
     print()
     hr()
     print("  COMMANDS")
     hr()
-    print("  start <case>     — begin a session (case: 'brown')")
-    print(f"  [ENTER]          — record voice Move (primary; IN_SESSION only) [{voice_status}]")
-    print("  > <text>         — submit your Move as text (always available)")
+    print("  start <case>     — begin a session (type 'cases' to list)")
+    print("  cases            — list available cases")
+    print("  > <text>         — submit your Move (argument)")
     print("  score            — evaluate the session (after it ends)")
     print("  review <N>       — expand key moment N")
     print("  back             — return to scorecard from review")
@@ -364,8 +357,6 @@ def repl():
 
     while True:
         print_state_banner(s)
-        if s.state == State.IN_SESSION and VOICE_AVAILABLE:
-            print("  [ Press ENTER to speak, or type a command (e.g. '> <text>', 'help') ]")
         try:
             raw = input("  » ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -373,19 +364,6 @@ def repl():
             sys.exit(0)
 
         if not raw:
-            if s.state == State.IN_SESSION and VOICE_AVAILABLE:
-                try:
-                    text = record_and_transcribe()
-                except Exception as exc:
-                    print(f"  [ Voice error: {exc} ]")
-                    print("  [ Use '> <text>' to type your argument instead. ]")
-                    continue
-                if not text:
-                    print("  [ No audio captured — try again or use '> <text>'. ]")
-                    continue
-                snippet = text[:70] + ("…" if len(text) > 70 else "")
-                print(f"  (( transcribed: {snippet} ))")
-                cmd_move(s, text)
             continue
 
         parts = raw.split(None, 1)
@@ -397,6 +375,8 @@ def repl():
             sys.exit(0)
         elif cmd == "help":
             print_help()
+        elif cmd == "cases":
+            cmd_cases()
         elif cmd == "start":
             cmd_start(s, arg or "brown")
         elif cmd == ">":
