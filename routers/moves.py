@@ -40,15 +40,10 @@ async def submit_move(session_id: str, request: Request) -> dict:
 
     engine = _get_engine()
     # KeyError → 404, InvalidStateError → 409 handled by app exception handlers
-    result = engine.submit_move(session_id, text)
-
-    from stream_queue import enqueue
-    enqueue(session_id, result.response)
+    deviation = engine.prepare_move(session_id, text)
 
     response: dict = {
-        "response": result.response,
-        "closes": result.closes,
-        "deviation": result.deviation,
+        "deviation": deviation,
         "stream_url": f"/sessions/{session_id}/stream",
     }
     if transcription is not None:

@@ -42,7 +42,7 @@ def migrate(dry_run: bool = False) -> int:
         print("sessions/ directory not found — nothing to migrate.")
         return 0
 
-    json_files = list(SESSIONS_DIR.rglob("*.json"))
+    json_files = [p for p in SESSIONS_DIR.rglob("*.json") if p.name != "council.db"]
     if not json_files:
         print("No JSON session files found.")
         return 0

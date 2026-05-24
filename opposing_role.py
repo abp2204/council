@@ -16,12 +16,12 @@ Usage:
 """
 
 import json
-import os
 import re
 
-from groq import Groq
+import ollama
 
 from case_library import load_case
+from domain import Turn
 
 
 class MockOpposingRole:
@@ -41,8 +41,8 @@ class MockOpposingRole:
         user_role = case.get("user_role", "")
         self._addressee: str = user_role.split()[1] if " " in user_role else "Counsel"
 
-    def respond(self, turn_history: list[dict]) -> tuple[str, bool]:
-        user_turns = [t for t in turn_history if t.get("role") == "user"]
+    def respond(self, turn_history: list[Turn]) -> tuple[str, bool]:
+        user_turns = [t for t in turn_history if t.role == "user"]
         n = len(user_turns)
 
         # Close after 3 user turns regardless — ensures test runner always gets a score
@@ -51,7 +51,7 @@ class MockOpposingRole:
 
         # Edge-case detection on the most recent user turn
         if user_turns:
-            last = user_turns[-1]["text"]
+            last = user_turns[-1].text
             response = self._edge_case_response(last)
             if response:
                 return response, False
@@ -118,63 +118,71 @@ class OpposingRole:
     across the Session. Signals session close via structured JSON output.
     """
 
-    MODEL = "llama-3.3-70b-versatile"
+    MODEL = "qwen2.5:14b"
 
     def __init__(self, case_id: str, model: str | None = None) -> None:
         case = load_case(case_id, operator=True)
         self._profile = case["opposing_role"]
         self._model = model or self.MODEL
-        api_key = os.environ.get("GROQ_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "GROQ_API_KEY is not set. Get a free key at console.groq.com, "
-                "then: export GROQ_API_KEY=..."
-            )
-        self._client = Groq(api_key=api_key)
 
-    def respond(self, turn_history: list[dict]) -> tuple[str, bool]:
+    def respond(self, user_text: str, turn_history: list[Turn]) -> dict:
         """
         Generate the next Opposing Role line given the full turn history.
 
         Args:
-            turn_history: List of {"role": str, "text": str} dicts.
-                          role is "user" or "opponent".
+            user_text: The user's latest argument (unused directly; already in turn_history).
+            turn_history: The session's Turn list.
 
         Returns:
-            (response_text, closes) where closes=True signals SESSION_END.
+            {"response": str, "closes": bool}
         """
         messages = self._build_messages(turn_history)
-        api_response = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            max_tokens=512,
-        )
+        api_response = ollama.chat(model=self._model, messages=messages)
+        raw = api_response.message.content.strip()
+        text, closes = self._parse_response(raw)
+        return {"response": text, "closes": closes}
 
-        raw = api_response.choices[0].message.content.strip()
-        return self._parse_response(raw)
+    def respond_stream(self, turn_history: list[Turn]):
+        """
+        Stream the Opposing Role response token by token.
 
-    def _build_messages(self, turn_history: list[dict]) -> list[dict]:
-        """Convert internal turn history to the OpenAI-compatible messages format."""
+        Yields str tokens as they arrive from the model. After iteration is
+        exhausted, StopIteration.value holds the closes boolean.
+
+        The full accumulated text is parsed for the JSON output contract only
+        after the stream ends — the closes signal is never emitted early.
+        """
+        messages = self._build_messages(turn_history)
+        accumulated: list[str] = []
+        for chunk in ollama.chat(model=self._model, messages=messages, stream=True):
+            token: str = chunk.message.content
+            if token:
+                accumulated.append(token)
+                yield token
+        full_text = "".join(accumulated)
+        _, closes = self._parse_response(full_text)
+        return closes
+
+    def _build_messages(self, turn_history: list[Turn]) -> list[dict]:
+        """Convert the session Turn list to the OpenAI-compatible messages format."""
         messages: list[dict] = [
             {"role": "system", "content": self._profile["system_prompt"]}
         ]
 
         # Prepend a kick-off if the first turn is from the opponent
-        if not turn_history or turn_history[0].get("role") == "opponent":
+        if not turn_history or turn_history[0].role == "opponent":
             messages.append(
                 {"role": "user", "content": "The oral argument has begun. Please open."}
             )
 
         for turn in turn_history:
-            role = turn.get("role", "user")
-            text = turn.get("text", "")
-            if role == "user":
-                messages.append({"role": "user", "content": text})
+            if turn.role == "user":
+                messages.append({"role": "user", "content": turn.text})
             else:
                 # Wrap opponent turns in the JSON envelope so the model sees
                 # its own prior structured outputs in context.
                 messages.append(
-                    {"role": "assistant", "content": json.dumps({"response": text, "closes": False})}
+                    {"role": "assistant", "content": json.dumps({"response": turn.text, "closes": False})}
                 )
 
         # Ensure the last message is from "user" (API requirement)

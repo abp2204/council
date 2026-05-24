@@ -8,9 +8,16 @@ constructor so callers can swap in mocks without any API keys.
 Public API:
     engine = SessionEngine(opposing_role_factory=..., evaluator=...)
     session_id = engine.create_session(case_id)
-    result     = engine.submit_move(session_id, text)   -> MoveResult
-    score      = engine.evaluate(session_id)            -> Score
-    moment     = engine.review(session_id, moment_index) -> KeyMoment
+    result     = engine.submit_move(session_id, text)         -> MoveResult  (offline/test path)
+    deviation  = engine.prepare_move(session_id, text)        -> bool        (live path: step 1)
+    engine.commit_response(session_id, response_text, closes)                (live path: step 2)
+    score      = engine.evaluate(session_id)                  -> Score
+    moment     = engine.review(session_id, moment_index)      -> KeyMoment
+    opening    = engine.get_opening(session_id)               -> str
+    response   = engine.get_last_response(session_id)         -> str | None
+    role       = engine.get_opposing_role(session_id)         -> object
+    case_id    = engine.get_case_id(session_id)               -> str
+    turns      = engine.get_turns(session_id)                 -> list[Turn]
 """
 
 from __future__ import annotations
@@ -23,8 +30,22 @@ from enum import Enum, auto
 
 from case_library import load_case
 from deviation_detector import DeviationDetector
+from domain import KeyMoment, MoveResult, Score, Turn
 
 logger = logging.getLogger(__name__)
+
+# Re-export domain types so existing imports from session_engine still work.
+__all__ = [
+    "KeyMoment",
+    "MoveResult",
+    "Score",
+    "Turn",
+    "State",
+    "InvalidStateError",
+    "MockOpposingRole",
+    "MockEvaluator",
+    "SessionEngine",
+]
 
 
 # ── State Machine ─────────────────────────────────────────────────────────────
@@ -42,42 +63,18 @@ class InvalidStateError(Exception):
     pass
 
 
-# ── Data classes ─────────────────────────────────────────────────────────────
-
-@dataclass
-class KeyMoment:
-    turn: int
-    label: str   # "best_move" | "worst_move" | "deviation_point"
-    user_text: str
-    commentary: str
-
-
-@dataclass
-class Score:
-    legal_soundness: int
-    strategic_effectiveness: int
-    creativity: int
-    key_moments: list[KeyMoment] = field(default_factory=list)
-
-
-@dataclass
-class MoveResult:
-    response: str
-    closes: bool
-    deviation: bool
-
-
 # ── Internal session state ────────────────────────────────────────────────────
 
 @dataclass
 class _SessionState:
     state: State = State.IN_SESSION
     case_id: str = ""
-    turns: list[dict] = field(default_factory=list)
+    turns: list[Turn] = field(default_factory=list)
     deviation_count: int = 0
     score: Score | None = None
     case: dict = field(default_factory=dict)
     opposing_role: object = field(default=None, repr=False)
+    last_response: str = ""
 
 
 # ── Mock stubs (injected for tests) ──────────────────────────────────────────
@@ -99,8 +96,8 @@ class MockOpposingRole:
         self._probe_index = 0
         self._probes_completed = False
 
-    def respond(self, user_text: str, turns: list[dict]) -> dict:
-        user_turns = [t for t in turns if t.get("role") == "user"]
+    def respond(self, user_text: str, turns: list[Turn]) -> dict:
+        user_turns = [t for t in turns if t.role == "user"]
         n = len(user_turns)
 
         if not self._probes_completed and self._probe_index >= len(self._probes):
@@ -125,8 +122,8 @@ class MockEvaluator:
     derived from the actual session turns.
     """
 
-    def evaluate(self, session_state: _SessionState) -> Score:
-        user_turns = [(i, t) for i, t in enumerate(session_state.turns) if t["role"] == "user"]
+    def evaluate(self, turns: list[Turn], historical_record: list[str], case: dict) -> Score:
+        user_turns = [(i, t) for i, t in enumerate(turns) if t.role == "user"]
         moments: list[KeyMoment] = []
 
         if user_turns:
@@ -134,18 +131,18 @@ class MockEvaluator:
             moments.append(KeyMoment(
                 turn=best_idx + 1,
                 label="best_move",
-                user_text=best_turn["text"],
+                user_text=best_turn.text,
                 commentary="Strong opening framing.",
             ))
 
-        deviation_turns = [(i, t) for i, t in enumerate(session_state.turns)
-                           if t["role"] == "user" and t.get("deviation")]
+        deviation_turns = [(i, t) for i, t in enumerate(turns)
+                           if t.role == "user" and t.deviation]
         if deviation_turns:
             worst_idx, worst_turn = deviation_turns[-1]
             moments.append(KeyMoment(
                 turn=worst_idx + 1,
                 label="deviation_point",
-                user_text=worst_turn["text"],
+                user_text=worst_turn.text,
                 commentary="This diverged from the historical record.",
             ))
 
@@ -154,7 +151,7 @@ class MockEvaluator:
             moments.append(KeyMoment(
                 turn=last_idx + 1,
                 label="worst_move",
-                user_text=last_turn["text"],
+                user_text=last_turn.text,
                 commentary="Closing without addressing the DC schools counterargument.",
             ))
 
@@ -204,16 +201,50 @@ class SessionEngine:
         first_response = opposing_role.respond("", [])
 
         session_id = str(uuid.uuid4())
+        opening_text = first_response["response"]
         s = _SessionState(
             state=State.IN_SESSION,
             case_id=case_id,
             case=case,
+            last_response=opening_text,
         )
-        s.turns.append({"role": "opponent", "text": first_response["response"]})
+        s.turns.append(Turn(role="opponent", text=opening_text))
         s.opposing_role = opposing_role
         self._sessions[session_id] = s
 
         return session_id
+
+    def prepare_move(self, session_id: str, text: str) -> bool:
+        """
+        Validate state, detect deviation, and append the user turn.
+
+        Does NOT call the LLM — the caller is responsible for streaming the
+        Opposing Role response and calling commit_response() afterward.
+
+        Returns the deviation flag for the submitted move.
+        """
+        s = self._get_session(session_id)
+        if s.state != State.IN_SESSION:
+            raise InvalidStateError(
+                f"prepare_move requires state IN_SESSION, but session is {s.state.name}"
+            )
+
+        turn_index = sum(1 for t in s.turns if t.role == "user")
+        deviation, sim_score = self._detector.detect(text, turn_index, s.case.get("historical_record", []))
+        logger.debug("prepare_move turn=%d sim_score=%.3f deviation=%s", turn_index, sim_score, deviation)
+        if deviation:
+            s.deviation_count += 1
+
+        s.turns.append(Turn(role="user", text=text, deviation=deviation))
+        return deviation
+
+    def commit_response(self, session_id: str, response_text: str, closes: bool) -> None:
+        """Append the Opposing Role's response and advance state if the session closes."""
+        s = self._get_session(session_id)
+        s.turns.append(Turn(role="opponent", text=response_text))
+        s.last_response = response_text
+        if closes:
+            s.state = State.SESSION_END
 
     def submit_move(self, session_id: str, text: str) -> MoveResult:
         s = self._get_session(session_id)
@@ -222,16 +253,17 @@ class SessionEngine:
                 f"submit_move requires state IN_SESSION, but session is {s.state.name}"
             )
 
-        turn_index = len([t for t in s.turns if t["role"] == "user"])
+        turn_index = sum(1 for t in s.turns if t.role == "user")
         deviation, sim_score = self._detector.detect(text, turn_index, s.case.get("historical_record", []))
         logger.debug("submit_move turn=%d sim_score=%.3f deviation=%s", turn_index, sim_score, deviation)
         if deviation:
             s.deviation_count += 1
 
-        s.turns.append({"role": "user", "text": text, "deviation": deviation})
+        s.turns.append(Turn(role="user", text=text, deviation=deviation))
 
         opp_result = s.opposing_role.respond(text, s.turns)
-        s.turns.append({"role": "opponent", "text": opp_result["response"]})
+        s.turns.append(Turn(role="opponent", text=opp_result["response"]))
+        s.last_response = opp_result["response"]
 
         if opp_result["closes"]:
             s.state = State.SESSION_END
@@ -251,7 +283,11 @@ class SessionEngine:
 
         s.state = State.EVALUATING
         try:
-            score = self._evaluator.evaluate(s)
+            score = self._evaluator.evaluate(
+                s.turns,
+                s.case.get("historical_record", []),
+                s.case,
+            )
         except Exception:
             s.state = State.SESSION_END
             raise
@@ -278,6 +314,26 @@ class SessionEngine:
 
         s.state = State.REVIEW
         return moments[moment_index]
+
+    # ── Public accessors ──────────────────────────────────────────────────────
+
+    def get_opening(self, session_id: str) -> str:
+        return self._get_session(session_id).turns[0].text
+
+    def get_opposing_role(self, session_id: str) -> object:
+        return self._get_session(session_id).opposing_role
+
+    def get_last_response(self, session_id: str) -> str | None:
+        s = self._get_session(session_id)
+        return s.last_response or None
+
+    def get_case_id(self, session_id: str) -> str:
+        return self._get_session(session_id).case_id
+
+    def get_turns(self, session_id: str) -> list[Turn]:
+        return self._get_session(session_id).turns
+
+    # ── Internal ──────────────────────────────────────────────────────────────
 
     def _get_session(self, session_id: str) -> _SessionState:
         s = self._sessions.get(session_id)
