@@ -12,7 +12,6 @@ Public API:
 """
 
 import json
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,27 +31,12 @@ def save_session(s) -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     path = case_dir / f"{ts}.json"
 
-    key_moments = [
-        {
-            "turn": m.turn,
-            "label": m.label,
-            "user_text": m.user_text,
-            "commentary": m.commentary,
-        }
-        for m in s.score.get("key_moments", [])
-    ]
-
     record = {
         "case_id": s.case_id,
         "session_id": s.session_id,
         "timestamp": ts,
         "turns": s.turns,
-        "score": {
-            "legal_soundness": s.score["legal_soundness"],
-            "strategic_effectiveness": s.score["strategic_effectiveness"],
-            "creativity": s.score["creativity"],
-            "key_moments": key_moments,
-        },
+        "score": s.score,
     }
 
     with open(path, "w") as f:
