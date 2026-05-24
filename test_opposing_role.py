@@ -1,7 +1,7 @@
 """
 Tests for OpposingRole — Issue #4 acceptance criteria.
 
-Requires GROQ_API_KEY in environment.
+Requires Ollama running locally with qwen2.5:14b.
 
 Run: python3 test_opposing_role.py
 """
@@ -13,7 +13,15 @@ import unittest
 from opposing_role import OpposingRole
 
 
-@unittest.skipUnless(os.environ.get("GROQ_API_KEY"), "GROQ_API_KEY not set")
+def _ollama_running():
+    try:
+        import ollama
+        ollama.list()
+        return True
+    except Exception:
+        return False
+
+@unittest.skipUnless(_ollama_running(), "Ollama not running")
 class TestOpposingRole(unittest.TestCase):
 
     def setUp(self):
@@ -136,7 +144,7 @@ class TestOpposingRole(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    if not os.environ.get("GROQ_API_KEY"):
-        print("GROQ_API_KEY not set — skipping live tests.")
+    if not _ollama_running():
+        print("Ollama not running — skipping live tests.")
         sys.exit(0)
     unittest.main(verbosity=2)

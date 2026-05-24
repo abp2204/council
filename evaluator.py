@@ -10,39 +10,17 @@ Session after SESSION_END, reads the full session transcript.
 
 Usage:
     from evaluator import EvaluatorRole
-    score = EvaluatorRole().evaluate(transcript, historical_record=..., case=...)
+    score = EvaluatorRole().evaluate(turns, historical_record=..., case=...)
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
-from dataclasses import dataclass, field
 
-import anthropic
+import ollama
 
-# ── Domain Dataclasses ────────────────────────────────────────────────────────
-
-
-@dataclass
-class KeyMoment:
-    """A notable inflection point in the user's argument sequence."""
-
-    turn_number: int   # 1-indexed count of user turns only (not absolute index)
-    label: str         # "best_move" | "worst_move" | "deviation_point"
-    user_text: str     # Exact user argument text
-    commentary: str    # Generative commentary referencing specific content from user_text
-
-
-@dataclass
-class Score:
-    """End-of-session scorecard produced by the Evaluator after SESSION_END."""
-
-    legal_soundness: int           # 0–100
-    strategic_effectiveness: int   # 0–100
-    creativity: int                # 0–100
-    key_moments: list[KeyMoment] = field(default_factory=list)  # 3–5 moments
+from domain import KeyMoment, Score, Turn
 
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
@@ -148,119 +126,90 @@ class EvaluatorRole:
 
     Runs exactly once per Session, after SESSION_END. Reads the full session
     transcript cold and returns a Score dataclass.
-
-    The transcript is a list of {"speaker": str, "text": str} dicts where
-    speaker is typically "opponent" or "user" (or the named roles).
     """
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = "qwen2.5:14b"
 
     def __init__(self) -> None:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY is not set. Export it before running the evaluator."
-            )
-        self._client = anthropic.Anthropic()
+        pass
 
-    def _build_transcript_text(self, transcript: list[dict]) -> str:
+    def _build_transcript_text(self, turns: list[Turn]) -> str:
         """
-        Render the transcript as readable text and annotate user turns with
+        Render the turn list as readable text, annotating user turns with
         their 1-indexed user-turn number so the model can reference them.
         """
         lines = []
         user_turn_number = 0
-        for entry in transcript:
-            speaker = entry.get("speaker", "unknown")
-            text = entry.get("text", "")
-            # Detect user turns by checking if speaker is not "opponent" / "opposing_role"
-            is_user = speaker.lower() not in ("opponent", "opposing_role", "opposing role")
-            if is_user:
+        for turn in turns:
+            if turn.role == "user":
                 user_turn_number += 1
-                lines.append(f"[USER TURN {user_turn_number}] {speaker}: {text}")
+                lines.append(f"[USER TURN {user_turn_number}] user: {turn.text}")
             else:
-                lines.append(f"[OPPONENT] {speaker}: {text}")
+                lines.append(f"[OPPONENT] opponent: {turn.text}")
         return "\n\n".join(lines)
 
     def evaluate(
         self,
-        transcript: list[dict],
+        turns: list[Turn],
         historical_record: list[str] | None = None,
         case: dict | None = None,
     ) -> Score:
         """
-        Evaluate a completed Session transcript.
+        Evaluate a completed Session.
 
         Args:
-            transcript: List of {"speaker": str, "text": str} dicts,
-                        alternating between opponent and user turns.
-            historical_record: Optional list of historical record strings for
-                               the case, sent with prompt caching.
+            turns: The session's Turn list from SessionEngine.
+            historical_record: Optional list of historical record strings.
             case: Optional case dict for additional context.
 
         Returns:
-            Score dataclass with legal_soundness, strategic_effectiveness,
-            creativity (all 0–100), and key_moments (3–5 KeyMoment objects).
+            Score with legal_soundness, strategic_effectiveness, creativity
+            (all 0–100), and key_moments (3–5 KeyMoment objects).
         """
-        transcript_text = self._build_transcript_text(transcript)
+        transcript_text = self._build_transcript_text(turns)
 
         historical_text = "\n".join(
             f"{i + 1}. {r}" for i, r in enumerate(historical_record or [])
         )
 
-        historical_block: dict = {
-            "type": "text",
-            "text": f"HISTORICAL RECORD:\n{historical_text}",
-        }
-        if historical_record:
-            historical_block["cache_control"] = {"type": "ephemeral"}
+        user_content = (
+            f"HISTORICAL RECORD:\n{historical_text}\n\n"
+            f"SESSION TRANSCRIPT:\n\n{transcript_text}\n\n"
+            "Please evaluate and return your scorecard as a JSON object."
+        )
 
-        response = self._client.messages.create(
+        response = ollama.chat(
             model=self.MODEL,
-            max_tokens=2048,
-            system=_EVALUATOR_SYSTEM_PROMPT,
             messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        historical_block,
-                        {
-                            "type": "text",
-                            "text": (
-                                f"SESSION TRANSCRIPT:\n\n{transcript_text}\n\n"
-                                "Please evaluate and return your scorecard as a JSON object."
-                            ),
-                        },
-                    ],
-                }
+                {"role": "system", "content": _EVALUATOR_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
             ],
         )
 
-        if not response.content:
-            raise RuntimeError("Anthropic API returned an empty content list.")
-        raw = response.content[0].text.strip()
-        return self._parse_score(raw, transcript)
+        raw = response.message.content.strip()
+        return self._parse_score(raw, turns)
 
-    def _parse_score(self, raw: str, transcript: list[dict]) -> Score:
+    def _parse_score(self, raw: str, turns: list[Turn]) -> Score:
         """
         Parse the LLM JSON response into a Score dataclass.
         Handles JSON parse errors gracefully by returning a fallback Score.
         """
-        # Strip markdown code fences if the model wrapped the JSON
         cleaned = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
         cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
         cleaned = cleaned.strip()
 
+        user_texts: list[str] = [t.text for t in turns if t.role == "user"]
+
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError as exc:
-            # Graceful fallback: return a neutral score with an error note
             return Score(
                 legal_soundness=50,
                 strategic_effectiveness=50,
                 creativity=50,
                 key_moments=[
                     KeyMoment(
-                        turn_number=1,
+                        turn=1,
                         label="deviation_point",
                         user_text="(parse error — see evaluator logs)",
                         commentary=(
@@ -270,13 +219,13 @@ class EvaluatorRole:
                         ),
                     ),
                     KeyMoment(
-                        turn_number=1,
+                        turn=1,
                         label="best_move",
                         user_text="(parse error fallback)",
                         commentary="Evaluator parse error; scores are neutral defaults.",
                     ),
                     KeyMoment(
-                        turn_number=1,
+                        turn=1,
                         label="worst_move",
                         user_text="(parse error fallback)",
                         commentary="Evaluator parse error; scores are neutral defaults.",
@@ -284,20 +233,12 @@ class EvaluatorRole:
                 ],
             )
 
-        # Extract scores with bounds clamping; guard against JSON null
         def _safe_score(val, default: int = 50) -> int:
             return max(0, min(100, int(val if val is not None else default)))
 
         legal_soundness = _safe_score(data.get("legal_soundness"))
         strategic_effectiveness = _safe_score(data.get("strategic_effectiveness"))
         creativity = _safe_score(data.get("creativity"))
-
-        # Build user-turn index for fast lookup (1-indexed)
-        user_turns: list[str] = []
-        for entry in transcript:
-            speaker = entry.get("speaker", "")
-            if speaker.lower() not in ("opponent", "opposing_role", "opposing role"):
-                user_turns.append(entry.get("text", ""))
 
         key_moments: list[KeyMoment] = []
         for km in data.get("key_moments", []):
@@ -307,34 +248,30 @@ class EvaluatorRole:
             user_text = km.get("user_text", "")
             commentary = km.get("commentary", "")
 
-            # If user_text is missing, try to recover from the turn number
-            if not user_text and 1 <= turn_number <= len(user_turns):
-                user_text = user_turns[turn_number - 1]
+            if not user_text and 1 <= turn_number <= len(user_texts):
+                user_text = user_texts[turn_number - 1]
 
-            # Clamp turn_number to valid range
-            turn_number = max(1, min(turn_number, max(len(user_turns), 1)))
+            turn_number = max(1, min(turn_number, max(len(user_texts), 1)))
 
-            # Validate label
             if label not in ("best_move", "worst_move", "deviation_point"):
                 label = "deviation_point"
 
             key_moments.append(
                 KeyMoment(
-                    turn_number=turn_number,
+                    turn=turn_number,
                     label=label,
                     user_text=user_text,
                     commentary=commentary,
                 )
             )
 
-        # Enforce 3–5 key moments (trim or pad if needed)
         key_moments = key_moments[:5]
         while len(key_moments) < 3:
             fallback_turn = len(key_moments) + 1
-            fallback_text = user_turns[min(fallback_turn - 1, len(user_turns) - 1)]
+            fallback_text = user_texts[min(fallback_turn - 1, len(user_texts) - 1)] if user_texts else ""
             key_moments.append(
                 KeyMoment(
-                    turn_number=fallback_turn,
+                    turn=fallback_turn,
                     label="deviation_point",
                     user_text=fallback_text,
                     commentary="(Evaluator produced fewer than 3 key moments; this entry was added as a fallback.)",

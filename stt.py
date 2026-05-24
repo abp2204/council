@@ -2,7 +2,7 @@
 COUNCIL — STT Layer (Issue #7)
 
 Voice-to-text transcription as the primary Move input modality.
-Uses Groq Whisper for fast transcription — target: <1s per turn.
+Uses local OpenAI Whisper (runs on-device, no API key required).
 
 Primary input path (IN_SESSION):
     1. User presses ENTER → recording starts
@@ -14,6 +14,7 @@ Text fallback: "> <text>" syntax in the REPL (always available).
 
 import io
 import os
+import tempfile
 import wave
 
 try:
@@ -23,26 +24,28 @@ try:
 except ImportError:
     VOICE_AVAILABLE = False
 
-from groq import Groq
+try:
+    import whisper as _whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
 
 SAMPLE_RATE = 16_000
 CHANNELS = 1
-_WHISPER_MODEL = "whisper-large-v3-turbo"
+_WHISPER_MODEL_NAME = "base"
 
-_client: "Groq | None" = None
+_whisper_model = None
 
 
-def _get_client() -> "Groq":
-    global _client
-    if _client is None:
-        api_key = os.environ.get("GROQ_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "GROQ_API_KEY is not set — cannot transcribe. "
-                "Use '> <text>' to type your argument instead."
+def _get_model():
+    global _whisper_model
+    if _whisper_model is None:
+        if not WHISPER_AVAILABLE:
+            raise RuntimeError(
+                "openai-whisper not installed. Run: pip install openai-whisper"
             )
-        _client = Groq(api_key=api_key)
-    return _client
+        _whisper_model = _whisper.load_model(_WHISPER_MODEL_NAME)
+    return _whisper_model
 
 
 def record_until_enter(sample_rate: int = SAMPLE_RATE) -> bytes:
@@ -82,19 +85,21 @@ def record_until_enter(sample_rate: int = SAMPLE_RATE) -> bytes:
 
 
 def transcribe(audio_bytes: bytes) -> str:
-    """Transcribe WAV bytes via Groq Whisper. Returns plain text."""
+    """Transcribe WAV bytes via local Whisper. Returns plain text."""
     if not audio_bytes:
         return ""
 
-    client = _get_client()
-    buf = io.BytesIO(audio_bytes)
-    buf.name = "move.wav"  # Groq SDK reads .name for MIME sniffing
+    model = _get_model()
 
-    result = client.audio.transcriptions.create(
-        file=buf,
-        model=_WHISPER_MODEL,
-    )
-    return result.text.strip()
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+
+    try:
+        result = model.transcribe(tmp_path)
+        return result["text"].strip()
+    finally:
+        os.unlink(tmp_path)
 
 
 def record_and_transcribe() -> str:

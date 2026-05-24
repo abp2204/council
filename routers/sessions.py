@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 import session_store
@@ -26,9 +27,8 @@ def create_session(
     case_id = body.get("case_id", "")
     if not case_id:
         raise HTTPException(400, "case_id is required")
-    # KeyError (unknown case) and DraftCaseError (draft) are caught by app exception handlers
     session_id = engine.create_session(case_id)
-    opening = engine._sessions[session_id].turns[0]["text"]
+    opening = engine.get_opening(session_id)
     return {"session_id": session_id, "state": "IN_SESSION", "opening": opening}
 
 
@@ -37,18 +37,16 @@ def evaluate_session(
     session_id: str,
     engine: SessionEngine = Depends(engine_dep),
 ) -> dict:
-    # KeyError and InvalidStateError are caught by app exception handlers
     score = engine.evaluate(session_id)
 
-    s = engine._sessions[session_id]
     key_moments = [
         {"turn": km.turn, "label": km.label, "user_text": km.user_text, "commentary": km.commentary}
         for km in score.key_moments
     ]
     adapter = _SaveAdapter(
-        case_id=s.case_id,
+        case_id=engine.get_case_id(session_id),
         session_id=session_id,
-        turns=s.turns,
+        turns=[dataclasses.asdict(t) for t in engine.get_turns(session_id)],
         score={
             "legal_soundness": score.legal_soundness,
             "strategic_effectiveness": score.strategic_effectiveness,
@@ -71,8 +69,7 @@ def session_history(
     session_id: str,
     engine: SessionEngine = Depends(engine_dep),
 ) -> list[dict]:
-    # KeyError is caught by app exception handler → 404
-    case_id = engine._sessions[session_id].case_id
+    case_id = engine.get_case_id(session_id)
     records = session_store.load_sessions(case_id)
     return [
         {

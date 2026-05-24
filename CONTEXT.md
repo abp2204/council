@@ -6,6 +6,9 @@ A single bounded legal proceeding drawn from one source transcript — e.g., one
 ## Move
 The user's input for a single turn within a Case. A Move is free-form — spoken (preferred) or typed. Voice is the recommended input modality; text is the fallback.
 
+## Turn
+A single exchange unit in a Session — either a user Move or an Opposing Role response. Turns carry a role ("user" or "opponent"), the spoken text, and a deviation flag (true if the user's argument departed from the Historical Record). The ordered list of Turns for a Session is the authoritative transcript consumed by the Evaluator and persisted to the Session store.
+
 ## Score
 A multi-dimensional evaluation of the user's performance in a Case, across three axes: legal soundness, strategic effectiveness, and creativity. Delivered as an end-of-session scorecard: three aggregate dimension scores plus 3-5 highlighted key moments (best Move, worst Move, biggest Deviation point). During the Case, quality is signaled implicitly through the Opposing Role's in-character reactions — not numerical scores.
 

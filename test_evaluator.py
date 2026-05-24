@@ -1,8 +1,8 @@
 """
 COUNCIL — Evaluator Tests (Issue #19)
 
-Integration tests for EvaluatorRole using Claude Sonnet.
-All tests requiring the API are skipped when ANTHROPIC_API_KEY is not set.
+Integration tests for EvaluatorRole using local Ollama (qwen2.5:14b).
+Live tests are skipped when Ollama is not reachable.
 
 Non-API tests (parse logic) always run.
 """
@@ -12,9 +12,17 @@ from __future__ import annotations
 import os
 import pytest
 
-_needs_api_key = pytest.mark.skipif(
-    not os.environ.get("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set",
+def _ollama_running() -> bool:
+    try:
+        import ollama
+        ollama.list()
+        return True
+    except Exception:
+        return False
+
+_needs_ollama = pytest.mark.skipif(
+    not _ollama_running(),
+    reason="Ollama not running",
 )
 
 
@@ -151,7 +159,7 @@ MINIMAL_TRANSCRIPT: list[dict] = [
 # ── Integration Tests ─────────────────────────────────────────────────────────
 
 
-@_needs_api_key
+@_needs_ollama
 def test_evaluate_returns_score_with_all_fields():
     from evaluator import EvaluatorRole, Score
 
@@ -164,7 +172,7 @@ def test_evaluate_returns_score_with_all_fields():
     assert 0 <= score.creativity <= 100
 
 
-@_needs_api_key
+@_needs_ollama
 def test_evaluate_returns_3_to_5_key_moments():
     from evaluator import EvaluatorRole
 
@@ -174,7 +182,7 @@ def test_evaluate_returns_3_to_5_key_moments():
     assert 3 <= len(score.key_moments) <= 5
 
 
-@_needs_api_key
+@_needs_ollama
 def test_key_moment_user_text_is_substring_of_user_turn():
     from evaluator import EvaluatorRole
 
@@ -196,7 +204,7 @@ def test_key_moment_user_text_is_substring_of_user_turn():
         )
 
 
-@_needs_api_key
+@_needs_ollama
 def test_key_moment_commentary_is_non_empty():
     from evaluator import EvaluatorRole
 
@@ -209,7 +217,7 @@ def test_key_moment_commentary_is_non_empty():
         )
 
 
-@_needs_api_key
+@_needs_ollama
 def test_strong_session_scores_higher_than_weak():
     from evaluator import EvaluatorRole
 
@@ -223,7 +231,7 @@ def test_strong_session_scores_higher_than_weak():
     )
 
 
-@_needs_api_key
+@_needs_ollama
 def test_all_key_moment_commentaries_are_unique():
     from evaluator import EvaluatorRole
 
@@ -240,7 +248,7 @@ def test_all_key_moment_commentaries_are_unique():
     )
 
 
-@_needs_api_key
+@_needs_ollama
 def test_evaluate_with_no_historical_record():
     from evaluator import EvaluatorRole, Score
 
@@ -251,7 +259,7 @@ def test_evaluate_with_no_historical_record():
     assert 3 <= len(score.key_moments) <= 5
 
 
-@_needs_api_key
+@_needs_ollama
 def test_evaluate_with_case_context():
     from evaluator import EvaluatorRole, Score
 
@@ -269,40 +277,29 @@ class TestParseScore:
     """Tests for _parse_score that don't require an API key."""
 
     def test_parse_score_clamps_out_of_range(self):
-        import importlib
-        import sys
+        from evaluator import EvaluatorRole
 
-        # Temporarily set a fake key so EvaluatorRole can be instantiated
-        os.environ["ANTHROPIC_API_KEY"] = "sk-fake-key-for-parse-test"
-        try:
-            # Re-import to pick up the env var
-            if "evaluator" in sys.modules:
-                del sys.modules["evaluator"]
-            from evaluator import EvaluatorRole
+        evaluator = EvaluatorRole.__new__(EvaluatorRole)
 
-            evaluator = EvaluatorRole.__new__(EvaluatorRole)
+        transcript = [
+            {"speaker": "user", "text": "My argument about equal protection."},
+            {"speaker": "user", "text": "Furthermore, Plessy must be overruled."},
+            {"speaker": "user", "text": "The Constitution demands desegregation."},
+        ]
 
-            transcript = [
-                {"speaker": "user", "text": "My argument about equal protection."},
-                {"speaker": "user", "text": "Furthermore, Plessy must be overruled."},
-                {"speaker": "user", "text": "The Constitution demands desegregation."},
+        raw_json = """{
+            "legal_soundness": 150,
+            "strategic_effectiveness": -5,
+            "creativity": 80,
+            "key_moments": [
+                {"turn_number": 1, "label": "best_move", "user_text": "My argument about equal protection.", "commentary": "Strong opening."},
+                {"turn_number": 2, "label": "worst_move", "user_text": "Furthermore, Plessy must be overruled.", "commentary": "Weak claim."},
+                {"turn_number": 3, "label": "deviation_point", "user_text": "The Constitution demands desegregation.", "commentary": "Novel framing."}
             ]
+        }"""
 
-            raw_json = """{
-                "legal_soundness": 150,
-                "strategic_effectiveness": -5,
-                "creativity": 80,
-                "key_moments": [
-                    {"turn_number": 1, "label": "best_move", "user_text": "My argument about equal protection.", "commentary": "Strong opening."},
-                    {"turn_number": 2, "label": "worst_move", "user_text": "Furthermore, Plessy must be overruled.", "commentary": "Weak claim."},
-                    {"turn_number": 3, "label": "deviation_point", "user_text": "The Constitution demands desegregation.", "commentary": "Novel framing."}
-                ]
-            }"""
+        score = evaluator._parse_score(raw_json, transcript)
 
-            score = evaluator._parse_score(raw_json, transcript)
-
-            assert score.legal_soundness == 100
-            assert score.strategic_effectiveness == 0
-            assert score.creativity == 80
-        finally:
-            del os.environ["ANTHROPIC_API_KEY"]
+        assert score.legal_soundness == 100
+        assert score.strategic_effectiveness == 0
+        assert score.creativity == 80

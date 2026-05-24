@@ -4,7 +4,7 @@ COUNCIL — Transcript Ingestion Pipeline
 Converts a raw SCOTUS oral argument transcript into a Case-ready dict
 containing a Historical Record (the arguing lawyer's verbatim turns) and
 a Profile (a behavioral fingerprint of the opposing role), using pure regex
-parsing for the record and Claude claude-sonnet-4-6 for the profile.
+parsing for the record and local Ollama (qwen2.5:14b) for the profile.
 
 Usage (library):
     result = ingest_transcript(raw_text, "MR. MARSHALL", "JUSTICE FRANKFURTER")
@@ -14,7 +14,7 @@ Usage (CLI):
     python -m transcript_ingestion <transcript.txt> --lawyer "MR. MARSHALL" --opponent "JUSTICE FRANKFURTER"
 
 Environment:
-    ANTHROPIC_API_KEY — required for profile extraction and system prompt synthesis.
+    Ollama must be running locally (ollama serve) with qwen2.5:14b pulled.
 """
 
 import os
@@ -132,18 +132,10 @@ def extract_profile(
     with all five required fields.
 
     Raises:
-        EnvironmentError: if ANTHROPIC_API_KEY is not set.
         ValueError: if the LLM response cannot be parsed as valid JSON with
                     the required fields.
     """
-    import anthropic  # deferred import so parsing still works without the SDK
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise EnvironmentError(
-            "ANTHROPIC_API_KEY environment variable is not set. "
-            "Profile extraction requires a valid Anthropic API key."
-        )
+    import ollama
 
     turns = _collect_turns_for(raw_text, opposing_role_name)
     if not turns:
@@ -160,29 +152,15 @@ def extract_profile(
         turns_block=turns_block,
     )
 
-    client = anthropic.Anthropic(api_key=api_key)
-
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        system=[
-            {
-                "type": "text",
-                "text": _PROFILE_SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
+    message = ollama.chat(
+        model="qwen2.5:14b",
         messages=[
+            {"role": "system", "content": _PROFILE_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
     )
 
-    if not message.content or not hasattr(message.content[0], "text"):
-        raise ValueError(
-            f"Unexpected API response: content is empty or not a text block. "
-            f"stop_reason={message.stop_reason!r}"
-        )
-    raw_response = message.content[0].text.strip()
+    raw_response = message.message.content.strip()
 
     # Strip optional markdown code fences if the model emits them despite instructions
     if raw_response.startswith("```"):
@@ -262,51 +240,28 @@ def synthesize_system_prompt(profile: dict) -> str:
     """
     Generate a system prompt from a behavioural Profile dict.
 
-    Calls Claude claude-sonnet-4-6 with a cached instruction system prompt,
+    Calls local Ollama (qwen2.5:14b),
     passing the profile as JSON in the user message.
 
     Raises:
-        EnvironmentError: if ANTHROPIC_API_KEY is not set.
         ValueError: if the response is empty or does not contain the required
                     output contract string.
     """
-    import anthropic  # deferred import so parsing still works without the SDK
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise EnvironmentError(
-            "ANTHROPIC_API_KEY environment variable is not set. "
-            "System prompt synthesis requires a valid Anthropic API key."
-        )
+    import ollama
 
     user_content = _SYNTHESIS_USER_TEMPLATE.format(
         profile_json=json.dumps(profile, indent=2)
     )
 
-    client = anthropic.Anthropic(api_key=api_key)
-
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        system=[
-            {
-                "type": "text",
-                "text": _SYNTHESIS_SYSTEM,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
+    message = ollama.chat(
+        model="qwen2.5:14b",
         messages=[
+            {"role": "system", "content": _SYNTHESIS_SYSTEM},
             {"role": "user", "content": user_content},
         ],
     )
 
-    if not message.content or not hasattr(message.content[0], "text"):
-        raise ValueError(
-            f"Unexpected API response: content is empty or not a text block. "
-            f"stop_reason={message.stop_reason!r}"
-        )
-
-    system_prompt = message.content[0].text.strip()
+    system_prompt = message.message.content.strip()
 
     if not system_prompt:
         raise ValueError("synthesize_system_prompt returned an empty string.")
@@ -360,7 +315,7 @@ def ingest_transcript(
     Notes
     -----
     - Historical Record extraction is pure parsing; no API key required.
-    - Profile extraction calls Claude claude-sonnet-4-6 and requires ANTHROPIC_API_KEY.
+    - Profile extraction calls local Ollama (qwen2.5:14b); requires Ollama running.
     """
     historical_record = extract_historical_record(raw_text, lawyer_name)
     if not historical_record:

@@ -443,7 +443,7 @@ def test_evaluate_rollback_on_exception(mock_probes, mock_close):
     """evaluate() restores SESSION_END state if the evaluator raises."""
 
     class BrokenEvaluator:
-        def evaluate(self, session_state):
+        def evaluate(self, turns, historical_record, case):
             raise RuntimeError("evaluator exploded")
 
     def factory(case: dict) -> MockOpposingRole:
