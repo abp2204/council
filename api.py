@@ -33,7 +33,8 @@ class _EvaluatorAdapter:
             {"speaker": t["role"], "text": t["text"]}
             for t in session_state.turns  # type: ignore[attr-defined]
         ]
-        raw = self._real.evaluate(transcript)  # type: ignore[attr-defined]
+        historical_record = session_state.case.get("historical_record", [])  # type: ignore[attr-defined]
+        raw = self._real.evaluate(transcript, historical_record=historical_record, case=session_state.case)  # type: ignore[attr-defined]
         # evaluator.KeyMoment uses turn_number; session_engine.KeyMoment uses turn
         moments = [
             KeyMoment(
