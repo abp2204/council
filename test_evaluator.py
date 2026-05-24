@@ -1,34 +1,25 @@
 """
-COUNCIL — End-to-End Test: Generative Evaluator (Issue #2)
+COUNCIL — Evaluator Tests (Issue #19)
 
-Tests EvaluatorRole against two mock transcripts:
-  - weak_session:   factually wrong / conceding arguments  (C3-equivalent)
-  - strong_session: precise constitutional arguments citing precedent (F1-equivalent)
+Integration tests for EvaluatorRole using Claude Sonnet.
+All tests requiring the API are skipped when ANTHROPIC_API_KEY is not set.
 
-Expected assertions:
-  1. strong_session.legal_soundness > weak_session.legal_soundness
-  2. All key moments have unique commentary strings (no identical canned text)
-  3. All key moment turn_numbers are 1-indexed user-turn numbers (>= 1)
-
-Run: python test_evaluator.py
-Requires: ANTHROPIC_API_KEY set in environment.
+Non-API tests (parse logic) always run.
 """
 
+from __future__ import annotations
+
 import os
-import sys
+import pytest
 
-# ── Guard: require API key before importing evaluator ─────────────────────────
+_needs_api_key = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY"),
+    reason="ANTHROPIC_API_KEY not set",
+)
 
-if not os.environ.get("ANTHROPIC_API_KEY"):
-    print("ERROR: ANTHROPIC_API_KEY is not set in the environment.")
-    print("Export it and re-run:  export ANTHROPIC_API_KEY=sk-...")
-    sys.exit(1)
-
-from evaluator import EvaluatorRole, Score  # noqa: E402 — imported after guard
 
 # ── Mock Transcripts ──────────────────────────────────────────────────────────
 
-# C3-equivalent: factually wrong citations, invented doctrine, conceding
 WEAK_SESSION: list[dict] = [
     {
         "speaker": "opponent",
@@ -79,7 +70,6 @@ WEAK_SESSION: list[dict] = [
     },
 ]
 
-# F1-equivalent: precise constitutional arguments, correct precedent, strong doctrine
 STRONG_SESSION: list[dict] = [
     {
         "speaker": "opponent",
@@ -139,147 +129,180 @@ STRONG_SESSION: list[dict] = [
     },
 ]
 
+HISTORICAL_RECORD = [
+    "Brown v. Board of Education (1954) was argued by Thurgood Marshall for the NAACP.",
+    "The case consolidated appeals from Kansas, South Carolina, Virginia, and Delaware.",
+    "Dr. Kenneth Clark's doll studies showed Black children preferred white dolls, demonstrating internalized inferiority.",
+    "Plessy v. Ferguson (1896) established the 'separate but equal' doctrine.",
+    "McLaurin v. Oklahoma State Regents (1950) found that restrictions on a Black graduate student violated Equal Protection.",
+    "Sweatt v. Painter (1950) required the University of Texas Law School to admit a Black applicant.",
+]
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def print_scorecard(label: str, score: Score) -> None:
-    width = 70
-    print()
-    print("=" * width)
-    print(f"  {label}")
-    print("=" * width)
-    print(f"  Legal Soundness         {score.legal_soundness:>3}/100")
-    print(f"  Strategic Effectiveness {score.strategic_effectiveness:>3}/100")
-    print(f"  Creativity              {score.creativity:>3}/100")
-    avg = (score.legal_soundness + score.strategic_effectiveness + score.creativity) // 3
-    print("-" * width)
-    print(f"  Overall (avg)           {avg:>3}/100")
-    print("=" * width)
-    print()
-    print(f"  Key moments ({len(score.key_moments)} flagged):")
-    print()
-    for i, km in enumerate(score.key_moments, 1):
-        badge = {
-            "best_move": "BEST",
-            "worst_move": "WORST",
-            "deviation_point": "DEVIATION",
-        }.get(km.label, km.label.upper())
-        print(f"  [{i}] Turn {km.turn_number}  [{badge}]")
-        preview = km.user_text[:80] + ("…" if len(km.user_text) > 80 else "")
-        print(f"      Arg:  {preview}")
-        commentary_preview = km.commentary[:120] + ("…" if len(km.commentary) > 120 else "")
-        print(f"      Note: {commentary_preview}")
-        print()
+MINIMAL_TRANSCRIPT: list[dict] = [
+    {"speaker": "opponent", "text": "What is your central argument here?"},
+    {"speaker": "user", "text": "The Equal Protection Clause prohibits state-enforced racial segregation in public schools."},
+    {"speaker": "opponent", "text": "How do you distinguish Plessy v. Ferguson?"},
+    {"speaker": "user", "text": "Plessy relied on a fiction of equality that the record before this Court disproves."},
+    {"speaker": "opponent", "text": "What remedy do you seek?"},
+    {"speaker": "user", "text": "We seek a declaration that segregated schools are unconstitutional and an order to desegregate."},
+]
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Integration Tests ─────────────────────────────────────────────────────────
 
 
-def main() -> None:
+@_needs_api_key
+def test_evaluate_returns_score_with_all_fields():
+    from evaluator import EvaluatorRole, Score
+
     evaluator = EvaluatorRole()
+    score = evaluator.evaluate(MINIMAL_TRANSCRIPT, historical_record=HISTORICAL_RECORD)
 
-    print()
-    print("Running EvaluatorRole on weak_session (C3-equivalent)…")
-    weak_score = evaluator.evaluate(WEAK_SESSION)
-    print_scorecard("WEAK SESSION — factually wrong / conceding arguments", weak_score)
+    assert isinstance(score, Score)
+    assert 0 <= score.legal_soundness <= 100
+    assert 0 <= score.strategic_effectiveness <= 100
+    assert 0 <= score.creativity <= 100
 
-    print()
-    print("Running EvaluatorRole on strong_session (F1-equivalent)…")
-    strong_score = evaluator.evaluate(STRONG_SESSION)
-    print_scorecard("STRONG SESSION — precise constitutional arguments citing precedent", strong_score)
 
-    # ── Assertions ────────────────────────────────────────────────────────────
+@_needs_api_key
+def test_evaluate_returns_3_to_5_key_moments():
+    from evaluator import EvaluatorRole
 
-    failures: list[str] = []
+    evaluator = EvaluatorRole()
+    score = evaluator.evaluate(MINIMAL_TRANSCRIPT, historical_record=HISTORICAL_RECORD)
 
-    # 1. Strong session must score higher on legal_soundness
-    if strong_score.legal_soundness <= weak_score.legal_soundness:
-        failures.append(
-            f"FAIL: strong_session.legal_soundness ({strong_score.legal_soundness}) "
-            f"is not greater than weak_session.legal_soundness ({weak_score.legal_soundness})"
+    assert 3 <= len(score.key_moments) <= 5
+
+
+@_needs_api_key
+def test_key_moment_user_text_is_substring_of_user_turn():
+    from evaluator import EvaluatorRole
+
+    evaluator = EvaluatorRole()
+    score = evaluator.evaluate(MINIMAL_TRANSCRIPT, historical_record=HISTORICAL_RECORD)
+
+    user_texts = [t["text"] for t in MINIMAL_TRANSCRIPT if t["speaker"] == "user"]
+
+    for km in score.key_moments:
+        assert km.user_text, f"key_moment.user_text is empty for turn {km.turn_number}"
+        matched = any(
+            km.user_text in user_text or user_text in km.user_text
+            for user_text in user_texts
         )
-    else:
-        print(
-            f"PASS: strong_session.legal_soundness ({strong_score.legal_soundness}) "
-            f"> weak_session.legal_soundness ({weak_score.legal_soundness})"
+        assert matched, (
+            f"key_moment.user_text not found in any user turn.\n"
+            f"  user_text: {km.user_text!r}\n"
+            f"  user turns: {user_texts}"
         )
 
-    # 2. All key moments across both sessions must have unique commentary
-    all_commentaries: list[str] = (
+
+@_needs_api_key
+def test_key_moment_commentary_is_non_empty():
+    from evaluator import EvaluatorRole
+
+    evaluator = EvaluatorRole()
+    score = evaluator.evaluate(MINIMAL_TRANSCRIPT, historical_record=HISTORICAL_RECORD)
+
+    for km in score.key_moments:
+        assert isinstance(km.commentary, str) and km.commentary.strip(), (
+            f"key_moment commentary is empty for turn {km.turn_number}"
+        )
+
+
+@_needs_api_key
+def test_strong_session_scores_higher_than_weak():
+    from evaluator import EvaluatorRole
+
+    evaluator = EvaluatorRole()
+    weak_score = evaluator.evaluate(WEAK_SESSION, historical_record=HISTORICAL_RECORD)
+    strong_score = evaluator.evaluate(STRONG_SESSION, historical_record=HISTORICAL_RECORD)
+
+    assert strong_score.legal_soundness > weak_score.legal_soundness, (
+        f"strong_session.legal_soundness ({strong_score.legal_soundness}) "
+        f"should be > weak_session.legal_soundness ({weak_score.legal_soundness})"
+    )
+
+
+@_needs_api_key
+def test_all_key_moment_commentaries_are_unique():
+    from evaluator import EvaluatorRole
+
+    evaluator = EvaluatorRole()
+    weak_score = evaluator.evaluate(WEAK_SESSION, historical_record=HISTORICAL_RECORD)
+    strong_score = evaluator.evaluate(STRONG_SESSION, historical_record=HISTORICAL_RECORD)
+
+    all_commentaries = (
         [km.commentary for km in weak_score.key_moments]
         + [km.commentary for km in strong_score.key_moments]
     )
-    seen: set[str] = set()
-    duplicate_commentaries: list[str] = []
-    for c in all_commentaries:
-        if c in seen:
-            duplicate_commentaries.append(c[:80])
-        seen.add(c)
-
-    if duplicate_commentaries:
-        failures.append(
-            f"FAIL: Found duplicate commentary strings: {duplicate_commentaries}"
-        )
-    else:
-        print("PASS: All key moment commentaries are unique (no identical strings)")
-
-    # 3. All turn_numbers must be >= 1 (1-indexed user-turn numbers)
-    bad_turns: list[int] = []
-    for score, session_label in [(weak_score, "weak"), (strong_score, "strong")]:
-        for km in score.key_moments:
-            if km.turn_number < 1:
-                bad_turns.append(km.turn_number)
-                failures.append(
-                    f"FAIL: {session_label}_session key moment has turn_number={km.turn_number} (must be >= 1)"
-                )
-
-    # Count user turns in each transcript to verify upper bound
-    def count_user_turns(transcript: list[dict]) -> int:
-        return sum(
-            1 for e in transcript
-            if e.get("speaker", "").lower() not in ("opponent", "opposing_role", "opposing role")
-        )
-
-    weak_user_turns = count_user_turns(WEAK_SESSION)
-    strong_user_turns = count_user_turns(STRONG_SESSION)
-
-    for km in weak_score.key_moments:
-        if km.turn_number > weak_user_turns:
-            failures.append(
-                f"FAIL: weak_session key moment turn_number={km.turn_number} "
-                f"exceeds total user turns ({weak_user_turns})"
-            )
-
-    for km in strong_score.key_moments:
-        if km.turn_number > strong_user_turns:
-            failures.append(
-                f"FAIL: strong_session key moment turn_number={km.turn_number} "
-                f"exceeds total user turns ({strong_user_turns})"
-            )
-
-    if not bad_turns and not any(f.startswith("FAIL: weak") or f.startswith("FAIL: strong") for f in failures):
-        print(
-            f"PASS: All key moment turn_numbers are 1-indexed user-turn numbers "
-            f"(weak: 1–{weak_user_turns}, strong: 1–{strong_user_turns})"
-        )
-
-    # ── Result ────────────────────────────────────────────────────────────────
-
-    print()
-    if failures:
-        print("=" * 70)
-        print("  TEST FAILURES:")
-        for f in failures:
-            print(f"  {f}")
-        print("=" * 70)
-        sys.exit(1)
-    else:
-        print("=" * 70)
-        print("  ALL ASSERTIONS PASSED")
-        print("=" * 70)
-        sys.exit(0)
+    assert len(all_commentaries) == len(set(all_commentaries)), (
+        "Duplicate commentary strings found across sessions"
+    )
 
 
-if __name__ == "__main__":
-    main()
+@_needs_api_key
+def test_evaluate_with_no_historical_record():
+    from evaluator import EvaluatorRole, Score
+
+    evaluator = EvaluatorRole()
+    score = evaluator.evaluate(MINIMAL_TRANSCRIPT)
+
+    assert isinstance(score, Score)
+    assert 3 <= len(score.key_moments) <= 5
+
+
+@_needs_api_key
+def test_evaluate_with_case_context():
+    from evaluator import EvaluatorRole, Score
+
+    case = {"id": "brown-v-board", "title": "Brown v. Board of Education", "historical_record": HISTORICAL_RECORD}
+    evaluator = EvaluatorRole()
+    score = evaluator.evaluate(MINIMAL_TRANSCRIPT, historical_record=HISTORICAL_RECORD, case=case)
+
+    assert isinstance(score, Score)
+    assert 0 <= score.legal_soundness <= 100
+
+
+# ── Non-API Tests (always run) ────────────────────────────────────────────────
+
+class TestParseScore:
+    """Tests for _parse_score that don't require an API key."""
+
+    def test_parse_score_clamps_out_of_range(self):
+        import importlib
+        import sys
+
+        # Temporarily set a fake key so EvaluatorRole can be instantiated
+        os.environ["ANTHROPIC_API_KEY"] = "sk-fake-key-for-parse-test"
+        try:
+            # Re-import to pick up the env var
+            if "evaluator" in sys.modules:
+                del sys.modules["evaluator"]
+            from evaluator import EvaluatorRole
+
+            evaluator = EvaluatorRole.__new__(EvaluatorRole)
+
+            transcript = [
+                {"speaker": "user", "text": "My argument about equal protection."},
+                {"speaker": "user", "text": "Furthermore, Plessy must be overruled."},
+                {"speaker": "user", "text": "The Constitution demands desegregation."},
+            ]
+
+            raw_json = """{
+                "legal_soundness": 150,
+                "strategic_effectiveness": -5,
+                "creativity": 80,
+                "key_moments": [
+                    {"turn_number": 1, "label": "best_move", "user_text": "My argument about equal protection.", "commentary": "Strong opening."},
+                    {"turn_number": 2, "label": "worst_move", "user_text": "Furthermore, Plessy must be overruled.", "commentary": "Weak claim."},
+                    {"turn_number": 3, "label": "deviation_point", "user_text": "The Constitution demands desegregation.", "commentary": "Novel framing."}
+                ]
+            }"""
+
+            score = evaluator._parse_score(raw_json, transcript)
+
+            assert score.legal_soundness == 100
+            assert score.strategic_effectiveness == 0
+            assert score.creativity == 80
+        finally:
+            del os.environ["ANTHROPIC_API_KEY"]

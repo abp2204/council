@@ -1,5 +1,5 @@
 """
-COUNCIL — Generative Evaluator (Issue #2)
+COUNCIL — Generative Evaluator (Issue #2, #19)
 
 Implements EvaluatorRole: a separate AI role — distinct from the Opposing Role —
 that reads the full Session transcript once after SESSION_END and produces a
@@ -10,8 +10,10 @@ Session after SESSION_END, reads the full session transcript.
 
 Usage:
     from evaluator import EvaluatorRole
-    score = EvaluatorRole().evaluate(transcript)
+    score = EvaluatorRole().evaluate(transcript, historical_record=..., case=...)
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -85,6 +87,8 @@ arguments that add no new angle.
 illuminate rather than obscure, and arguments that reframe the question \
 productively.
 
+Arguments are spoken advocacy, not legal briefs — evaluate the register accordingly.
+
 CRITICAL: Scores must reflect the actual content and quality of the arguments \
 in the transcript. Do NOT score based on deviation count, turn count, or any \
 metadata. Two sessions with the same number of turns can have very different \
@@ -149,15 +153,14 @@ class EvaluatorRole:
     speaker is typically "opponent" or "user" (or the named roles).
     """
 
-    MODEL = "claude-opus-4-7"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(self) -> None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError(
                 "ANTHROPIC_API_KEY is not set. Export it before running the evaluator."
             )
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._client = anthropic.Anthropic()
 
     def _build_transcript_text(self, transcript: list[dict]) -> str:
         """
@@ -178,13 +181,21 @@ class EvaluatorRole:
                 lines.append(f"[OPPONENT] {speaker}: {text}")
         return "\n\n".join(lines)
 
-    def evaluate(self, transcript: list[dict]) -> Score:
+    def evaluate(
+        self,
+        transcript: list[dict],
+        historical_record: list[str] | None = None,
+        case: dict | None = None,
+    ) -> Score:
         """
         Evaluate a completed Session transcript.
 
         Args:
             transcript: List of {"speaker": str, "text": str} dicts,
                         alternating between opponent and user turns.
+            historical_record: Optional list of historical record strings for
+                               the case, sent with prompt caching.
+            case: Optional case dict for additional context.
 
         Returns:
             Score dataclass with legal_soundness, strategic_effectiveness,
@@ -192,24 +203,34 @@ class EvaluatorRole:
         """
         transcript_text = self._build_transcript_text(transcript)
 
+        historical_text = "\n".join(
+            f"{i + 1}. {r}" for i, r in enumerate(historical_record or [])
+        )
+
+        historical_block: dict = {
+            "type": "text",
+            "text": f"HISTORICAL RECORD:\n{historical_text}",
+        }
+        if historical_record:
+            historical_block["cache_control"] = {"type": "ephemeral"}
+
         response = self._client.messages.create(
             model=self.MODEL,
             max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": _EVALUATOR_SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
+            system=_EVALUATOR_SYSTEM_PROMPT,
             messages=[
                 {
                     "role": "user",
-                    "content": (
-                        "Please evaluate the following session transcript and return "
-                        "your scorecard as a JSON object matching the schema above.\n\n"
-                        f"SESSION TRANSCRIPT:\n\n{transcript_text}"
-                    ),
+                    "content": [
+                        historical_block,
+                        {
+                            "type": "text",
+                            "text": (
+                                f"SESSION TRANSCRIPT:\n\n{transcript_text}\n\n"
+                                "Please evaluate and return your scorecard as a JSON object."
+                            ),
+                        },
+                    ],
                 }
             ],
         )
