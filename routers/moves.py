@@ -42,8 +42,10 @@ async def submit_move(session_id: str, request: Request) -> dict:
     # KeyError → 404, InvalidStateError → 409 handled by app exception handlers
     result = engine.submit_move(session_id, text)
 
-    from stream_queue import enqueue
-    enqueue(session_id, result.response)
+    from stream_queue import enqueue_token, reset_tokens
+    reset_tokens(session_id)
+    for token in result.tokens:
+        enqueue_token(session_id, token)
 
     response: dict = {
         "response": result.response,

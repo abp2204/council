@@ -1,7 +1,7 @@
 """
 Tests for OpposingRole — Issue #4 acceptance criteria.
 
-Requires GROQ_API_KEY in environment.
+Requires GROQ_API_KEY in environment for live tests.
 
 Run: python3 test_opposing_role.py
 """
@@ -10,7 +10,61 @@ import os
 import sys
 import unittest
 
-from opposing_role import OpposingRole
+from opposing_role import MockOpposingRole, OpposingRole
+
+
+class TestMockOpposingRoleStreaming(unittest.TestCase):
+    """Tests for MockOpposingRole.stream_respond() — no API key required."""
+
+    def setUp(self):
+        self.role = MockOpposingRole("brown")
+
+    def test_stream_respond_yields_tokens(self):
+        """stream_respond should yield at least one non-empty token."""
+        gen = self.role.stream_respond("The Equal Protection Clause forbids racial classification.", [])
+        tokens = []
+        closes = False
+        try:
+            while True:
+                token = next(gen)
+                self.assertIsInstance(token, str)
+                tokens.append(token)
+        except StopIteration as exc:
+            closes = exc.value
+
+        full_text = "".join(tokens)
+        self.assertGreater(len(full_text), 0, "stream_respond should produce non-empty text")
+        self.assertIsInstance(closes, bool, "closes value should be a bool")
+
+    def test_stream_respond_closes_is_bool(self):
+        """Generator return value (closes) must always be a bool."""
+        gen = self.role.stream_respond("", [])
+        try:
+            while True:
+                next(gen)
+        except StopIteration as exc:
+            self.assertIsInstance(exc.value, bool)
+
+    def test_stream_respond_assembles_same_as_respond(self):
+        """Assembled tokens from stream_respond match respond() output text."""
+        turn_history = [
+            {"role": "user", "text": "The Equal Protection Clause requires strict scrutiny."},
+        ]
+        result = self.role.respond("The Equal Protection Clause requires strict scrutiny.", turn_history)
+        expected_text = result["response"]
+
+        # Fresh role instance to reset state
+        role2 = MockOpposingRole("brown")
+        gen = role2.stream_respond("The Equal Protection Clause requires strict scrutiny.", turn_history)
+        tokens = []
+        try:
+            while True:
+                tokens.append(next(gen))
+        except StopIteration:
+            pass
+
+        assembled = "".join(tokens).strip()
+        self.assertEqual(assembled, expected_text.strip())
 
 
 @unittest.skipUnless(os.environ.get("GROQ_API_KEY"), "GROQ_API_KEY not set")
@@ -135,8 +189,53 @@ class TestOpposingRole(unittest.TestCase):
         self.assertGreater(len(probes_seen), 0, "Frankfurter should surface at least one of his three canonical probes across 3 turns")
 
 
+def _ollama_available() -> bool:
+    """Return True if Ollama is reachable at the configured URL."""
+    import urllib.request
+    url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    # Strip the /v1 path suffix properly (not via rstrip which strips chars, not suffix)
+    if url.endswith("/v1"):
+        base = url[: -len("/v1")]
+    else:
+        base = url.rstrip("/")
+    try:
+        urllib.request.urlopen(base, timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+@unittest.skipUnless(_ollama_available(), "Ollama not reachable")
+class TestOpposingRoleStreamingLive(unittest.TestCase):
+    """Live integration tests for OpposingRole.stream_respond() — requires Ollama."""
+
+    def setUp(self):
+        self.role = OpposingRole("brown")
+
+    def test_stream_respond_yields_tokens(self):
+        """stream_respond should yield non-empty tokens and return a bool."""
+        turn_history = [
+            {"role": "user", "text": "The Equal Protection Clause requires strict scrutiny."},
+        ]
+        gen = self.role.stream_respond(
+            "The Equal Protection Clause requires strict scrutiny.", turn_history
+        )
+        tokens = []
+        closes = False
+        try:
+            while True:
+                token = next(gen)
+                self.assertIsInstance(token, str)
+                tokens.append(token)
+        except StopIteration as exc:
+            closes = exc.value
+
+        full_text = "".join(tokens)
+        self.assertGreater(len(full_text), 0, "stream_respond should produce non-empty text")
+        self.assertIsInstance(closes, bool, "closes value should be a bool")
+
+
 if __name__ == "__main__":
     if not os.environ.get("GROQ_API_KEY"):
-        print("GROQ_API_KEY not set — skipping live tests.")
-        sys.exit(0)
+        print("GROQ_API_KEY not set — skipping live Groq tests.")
     unittest.main(verbosity=2)

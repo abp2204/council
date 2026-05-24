@@ -61,6 +61,7 @@ class MoveResult:
     response: str
     closes: bool
     deviation: bool
+    tokens: list[str] = field(default_factory=list)
 
 
 # ── Internal session state ────────────────────────────────────────────────────
@@ -113,6 +114,16 @@ class MockOpposingRole:
 
         closes = self._probes_completed and n >= 3
         return {"response": response, "closes": closes}
+
+    def stream_respond(self, user_text: str, turns: list[dict]):
+        """
+        Generator that yields word tokens and returns closes as generator return value.
+        Delegates to respond() so mock behaviour is consistent.
+        """
+        result = self.respond(user_text, turns)
+        for word in result["response"].split():
+            yield word + " "
+        return result["closes"]
 
 
 class MockEvaluator:
@@ -237,16 +248,38 @@ class SessionEngine:
 
         s.turns.append({"role": "user", "text": text, "deviation": deviation})
 
-        opp_result = s.opposing_role.respond(text, s.turns)
-        s.turns.append({"role": "opponent", "text": opp_result["response"]})
+        # Use stream_respond if available for token-by-token delivery
+        if hasattr(s.opposing_role, "stream_respond"):
+            gen = s.opposing_role.stream_respond(text, s.turns)
+            tokens: list[str] = []
+            closes = False
+            try:
+                while True:
+                    token = next(gen)
+                    tokens.append(token)
+            except StopIteration as exc:
+                closes = bool(exc.value)
+            opp_response = "".join(tokens)
+            # Fallback: if the LLM emitted no content chunks, store the full
+            # response as one token so the stream endpoint doesn't return 404.
+            if not tokens and opp_response:
+                tokens = [opp_response]
+        else:
+            opp_result = s.opposing_role.respond(text, s.turns)
+            opp_response = opp_result["response"]
+            closes = opp_result["closes"]
+            tokens = [opp_response]
 
-        if opp_result["closes"]:
+        s.turns.append({"role": "opponent", "text": opp_response})
+
+        if closes:
             s.state = State.SESSION_END
 
         return MoveResult(
-            response=opp_result["response"],
-            closes=opp_result["closes"],
+            response=opp_response,
+            closes=closes,
             deviation=deviation,
+            tokens=tokens,
         )
 
     def evaluate(self, session_id: str) -> Score:

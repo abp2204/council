@@ -19,7 +19,7 @@ import json
 import os
 import re
 
-from groq import Groq
+from openai import OpenAI
 
 from case_library import load_case
 
@@ -41,33 +41,54 @@ class MockOpposingRole:
         user_role = case.get("user_role", "")
         self._addressee: str = user_role.split()[1] if " " in user_role else "Counsel"
 
-    def respond(self, turn_history: list[dict]) -> tuple[str, bool]:
+    def respond(self, user_text: str, turn_history: list[dict]) -> dict:
         user_turns = [t for t in turn_history if t.get("role") == "user"]
         n = len(user_turns)
 
         # Close after 3 user turns regardless — ensures test runner always gets a score
         if n >= 3:
-            return self._mock_close, True
+            return {"response": self._mock_close, "closes": True}
 
         # Edge-case detection on the most recent user turn
         if user_turns:
             last = user_turns[-1]["text"]
             response = self._edge_case_response(last)
             if response:
-                return response, False
+                return {"response": response, "closes": False}
 
         # Pick the next probe that hasn't been asked yet
         for i, probe in enumerate(self._mock_probes):
             if i not in self._probes_asked:
                 self._probes_asked.append(i)
-                return probe, False
+                return {"response": probe, "closes": False}
 
         # All probes asked but not enough user turns yet — press on the last one
-        return (
-            f"Mr. {self._addressee}, you have not yet given me a satisfactory answer. "
-            "Let me put the question again: " + self._mock_probes[self._probes_asked[-1]],
-            False,
-        )
+        return {
+            "response": (
+                f"Mr. {self._addressee}, you have not yet given me a satisfactory answer. "
+                "Let me put the question again: " + self._mock_probes[self._probes_asked[-1]]
+            ),
+            "closes": False,
+        }
+
+    def stream_respond(self, user_text: str, turn_history: list[dict]):
+        """
+        Generator that yields string tokens and returns closes as generator return value.
+
+        Usage:
+            gen = role.stream_respond(user_text, turns)
+            full_text = ""
+            try:
+                while True:
+                    token = next(gen)
+                    full_text += token
+            except StopIteration as e:
+                closes = e.value  # the bool
+        """
+        result = self.respond(user_text, turn_history)
+        for word in result["response"].split():
+            yield word + " "
+        return result["closes"]
 
     def _edge_case_response(self, text: str) -> str | None:
         words = text.split()
@@ -118,30 +139,25 @@ class OpposingRole:
     across the Session. Signals session close via structured JSON output.
     """
 
-    MODEL = "llama-3.3-70b-versatile"
+    MODEL = "qwen2.5:14b"
 
     def __init__(self, case_id: str, model: str | None = None) -> None:
         case = load_case(case_id, operator=True)
         self._profile = case["opposing_role"]
         self._model = model or self.MODEL
-        api_key = os.environ.get("GROQ_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "GROQ_API_KEY is not set. Get a free key at console.groq.com, "
-                "then: export GROQ_API_KEY=..."
-            )
-        self._client = Groq(api_key=api_key)
+        ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        self._client = OpenAI(base_url=ollama_url, api_key="ollama")
 
-    def respond(self, turn_history: list[dict]) -> tuple[str, bool]:
+    def respond(self, user_text: str, turn_history: list[dict]) -> dict:
         """
         Generate the next Opposing Role line given the full turn history.
 
         Args:
+            user_text: The user's most recent argument (already appended to turn_history).
             turn_history: List of {"role": str, "text": str} dicts.
-                          role is "user" or "opponent".
 
         Returns:
-            (response_text, closes) where closes=True signals SESSION_END.
+            {"response": str, "closes": bool} where closes=True signals SESSION_END.
         """
         messages = self._build_messages(turn_history)
         api_response = self._client.chat.completions.create(
@@ -151,7 +167,40 @@ class OpposingRole:
         )
 
         raw = api_response.choices[0].message.content.strip()
-        return self._parse_response(raw)
+        response_text, closes = self._parse_response(raw)
+        return {"response": response_text, "closes": closes}
+
+    def stream_respond(self, user_text: str, turn_history: list[dict]):
+        """
+        Generator that yields string tokens and returns closes as generator return value.
+
+        Usage:
+            gen = role.stream_respond(user_text, turns)
+            full_text = ""
+            try:
+                while True:
+                    token = next(gen)
+                    full_text += token
+            except StopIteration as e:
+                closes = e.value  # the bool
+        """
+        messages = self._build_messages(turn_history)
+        stream = self._client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            max_tokens=512,
+            stream=True,
+        )
+
+        accumulated = ""
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                accumulated += delta
+                yield delta
+
+        _, closes = self._parse_response(accumulated)
+        return closes  # becomes StopIteration.value
 
     def _build_messages(self, turn_history: list[dict]) -> list[dict]:
         """Convert internal turn history to the OpenAI-compatible messages format."""
