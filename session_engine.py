@@ -15,12 +15,16 @@ Public API:
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
 from case_library import load_case
+from deviation_detector import DeviationDetector
+
+logger = logging.getLogger(__name__)
 
 
 # ── State Machine ─────────────────────────────────────────────────────────────
@@ -162,19 +166,6 @@ class MockEvaluator:
         )
 
 
-# ── Deviation detection ───────────────────────────────────────────────────────
-
-def _detect_deviation(user_text: str, turn_index: int, historical_record: list[str]) -> bool:
-    """True if user's move diverges from the historical path."""
-    if turn_index >= len(historical_record):
-        return False
-    historical = historical_record[turn_index]
-    user_words = set(user_text.lower().split())
-    hist_words = set(historical.lower().split())
-    overlap = user_words & hist_words
-    return len(overlap) < 2
-
-
 # ── Session Engine ────────────────────────────────────────────────────────────
 
 class SessionEngine:
@@ -198,6 +189,7 @@ class SessionEngine:
         self._opposing_role_factory = opposing_role_factory
         self._evaluator = evaluator
         self._sessions: dict[str, _SessionState] = {}
+        self._detector = DeviationDetector()
 
     def create_session(self, case_id: str) -> str:
         """
@@ -231,7 +223,8 @@ class SessionEngine:
             )
 
         turn_index = len([t for t in s.turns if t["role"] == "user"])
-        deviation = _detect_deviation(text, turn_index, s.case.get("historical_record", []))
+        deviation, sim_score = self._detector.detect(text, turn_index, s.case.get("historical_record", []))
+        logger.debug("submit_move turn=%d sim_score=%.3f deviation=%s", turn_index, sim_score, deviation)
         if deviation:
             s.deviation_count += 1
 
