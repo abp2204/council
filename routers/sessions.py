@@ -41,8 +41,10 @@ def evaluate_session(
     score = engine.evaluate(session_id)
 
     s = engine._sessions[session_id]
-    # session_store.save_session uses json.dumps internally — key_moments must be
-    # plain dicts, NOT KeyMoment dataclass instances (dataclasses are not JSON-serialisable).
+    key_moments = [
+        {"turn": km.turn, "label": km.label, "user_text": km.user_text, "commentary": km.commentary}
+        for km in score.key_moments
+    ]
     adapter = _SaveAdapter(
         case_id=s.case_id,
         session_id=session_id,
@@ -51,10 +53,7 @@ def evaluate_session(
             "legal_soundness": score.legal_soundness,
             "strategic_effectiveness": score.strategic_effectiveness,
             "creativity": score.creativity,
-            "key_moments": [
-                {"turn": km.turn, "label": km.label, "user_text": km.user_text, "commentary": km.commentary}
-                for km in score.key_moments
-            ],
+            "key_moments": key_moments,
         },
     )
     session_store.save_session(adapter)
@@ -63,15 +62,7 @@ def evaluate_session(
         "legal_soundness": score.legal_soundness,
         "strategic_effectiveness": score.strategic_effectiveness,
         "creativity": score.creativity,
-        "key_moments": [
-            {
-                "turn": km.turn,
-                "label": km.label,
-                "user_text": km.user_text,
-                "commentary": km.commentary,
-            }
-            for km in score.key_moments
-        ],
+        "key_moments": key_moments,
     }
 
 

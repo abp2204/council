@@ -1,151 +1,60 @@
 """
-COUNCIL — Session Persistence (Issue #21)
+COUNCIL — Session Persistence (Issue #6)
 
-SQLite-backed session store.  Replaces the flat-JSON implementation with a
-single database file at sessions/council.db.
+Writes completed Sessions (state=SCORED) to disk as JSON.
+One file per session under sessions/<case_id>/<timestamp>.json.
+Human-readable format; no running server required.
 
-Schema is kept Postgres-compatible:
-  - TEXT primary keys (no AUTOINCREMENT / SERIAL)
-  - JSON columns stored as TEXT blobs
-
-Public API (unchanged from flat-JSON version):
-    save_session(session_state) -> None
-    load_sessions(case_id, user_id=None) -> list[dict]
+Public API:
+    save_session(session_state) -> Path
+    load_sessions(case_id) -> list[dict]
     format_history_summary(case_id) -> str | None
 """
 
-from __future__ import annotations
-
 import json
-import os
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 SESSIONS_DIR = Path(__file__).parent / "sessions"
-_DB_NAME = "council.db"
 
 
-def _db_path() -> Path:
-    return SESSIONS_DIR / _DB_NAME
+def save_session(s) -> Path:
+    """
+    Persist a SCORED SessionState to disk.
 
-
-def _get_conn() -> sqlite3.Connection:
-    """Open (and initialise) the SQLite database, returning a connection."""
+    Returns the path of the written file.
+    """
     SESSIONS_DIR.mkdir(exist_ok=True)
-    conn = sqlite3.connect(str(_db_path()))
-    conn.row_factory = sqlite3.Row
-    _init_schema(conn)
-    return conn
+    case_dir = SESSIONS_DIR / s.case_id
+    case_dir.mkdir(exist_ok=True)
 
-
-def _init_schema(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS sessions (
-            session_id  TEXT PRIMARY KEY,
-            case_id     TEXT NOT NULL,
-            user_id     TEXT,
-            timestamp   TEXT NOT NULL,
-            turns       TEXT NOT NULL,
-            score       TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
-def save_session(s) -> None:
-    """
-    Persist a SCORED session to the SQLite database.
-
-    ``s`` must expose:
-        s.case_id    str
-        s.session_id str
-        s.turns      list[dict]
-        s.score      dict  — keys: legal_soundness, strategic_effectiveness,
-                             creativity, key_moments (list of plain dicts)
-    """
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    path = case_dir / f"{ts}.json"
 
-    # key_moments must already be plain dicts so json.dumps works directly.
-    key_moments = [
-        {
-            "turn": m["turn"],
-            "label": m["label"],
-            "user_text": m["user_text"],
-            "commentary": m["commentary"],
-        }
-        for m in s.score.get("key_moments", [])
-    ]
-
-    score_blob = {
-        "legal_soundness": s.score["legal_soundness"],
-        "strategic_effectiveness": s.score["strategic_effectiveness"],
-        "creativity": s.score["creativity"],
-        "key_moments": key_moments,
+    record = {
+        "case_id": s.case_id,
+        "session_id": s.session_id,
+        "timestamp": ts,
+        "turns": s.turns,
+        "score": s.score,
     }
 
-    user_id: str | None = getattr(s, "user_id", None)
+    with open(path, "w") as f:
+        json.dump(record, f, indent=2)
 
-    with _get_conn() as conn:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO sessions
-                (session_id, case_id, user_id, timestamp, turns, score)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                s.session_id,
-                s.case_id,
-                user_id,
-                ts,
-                json.dumps(s.turns),
-                json.dumps(score_blob),
-            ),
-        )
+    return path
 
 
-def load_sessions(case_id: str, user_id: str | None = None) -> list[dict]:
-    """Return all persisted sessions for a Case, oldest first.
-
-    Pass ``user_id`` to filter by user.
-    """
-    try:
-        conn = _get_conn()
-    except Exception:
+def load_sessions(case_id: str) -> list[dict]:
+    """Return all persisted sessions for a Case, oldest first."""
+    case_dir = SESSIONS_DIR / case_id
+    if not case_dir.exists():
         return []
-
-    with conn:
-        if user_id is not None:
-            rows = conn.execute(
-                "SELECT * FROM sessions WHERE case_id = ? AND user_id = ? ORDER BY timestamp ASC",
-                (case_id, user_id),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM sessions WHERE case_id = ? ORDER BY timestamp ASC",
-                (case_id,),
-            ).fetchall()
-
-    result = []
-    for row in rows:
-        result.append(
-            {
-                "session_id": row["session_id"],
-                "case_id": row["case_id"],
-                "user_id": row["user_id"],
-                "timestamp": row["timestamp"],
-                "turns": json.loads(row["turns"]),
-                "score": json.loads(row["score"]),
-            }
-        )
-    return result
+    sessions = []
+    for path in sorted(case_dir.glob("*.json")):
+        with open(path) as f:
+            sessions.append(json.load(f))
+    return sessions
 
 
 def _overall(score: dict) -> int:
