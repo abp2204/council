@@ -125,32 +125,20 @@ class OpposingRole:
         self._profile = case["opposing_role"]
         self._model = model or self.MODEL
 
-    def respond(self, user_text: str, turn_history: list[Turn]) -> dict:
-        """
-        Generate the next Opposing Role line given the full turn history.
-
-        Args:
-            user_text: The user's latest argument (unused directly; already in turn_history).
-            turn_history: The session's Turn list.
-
-        Returns:
-            {"response": str, "closes": bool}
-        """
+    def respond(self, turn_history: list[Turn]) -> tuple[str, bool]:
+        """Generate the next Opposing Role line. Returns (response_text, closes)."""
         messages = self._build_messages(turn_history)
         api_response = ollama.chat(model=self._model, messages=messages)
         raw = api_response.message.content.strip()
-        text, closes = self._parse_response(raw)
-        return {"response": text, "closes": closes}
+        return self._parse_response(raw)
 
     def respond_stream(self, turn_history: list[Turn]):
         """
-        Stream the Opposing Role response token by token.
+        Generate the full response via Ollama, parse the JSON envelope, then
+        stream the clean response text word-by-word.
 
-        Yields str tokens as they arrive from the model. After iteration is
-        exhausted, StopIteration.value holds the closes boolean.
-
-        The full accumulated text is parsed for the JSON output contract only
-        after the stream ends — the closes signal is never emitted early.
+        Accumulating before yielding prevents the raw JSON wrapper from reaching
+        the client. StopIteration.value carries the closes boolean.
         """
         messages = self._build_messages(turn_history)
         accumulated: list[str] = []
@@ -158,15 +146,18 @@ class OpposingRole:
             token: str = chunk.message.content
             if token:
                 accumulated.append(token)
-                yield token
-        full_text = "".join(accumulated)
-        _, closes = self._parse_response(full_text)
+        full_raw = "".join(accumulated)
+        text, closes = self._parse_response(full_raw)
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            yield word if i == len(words) - 1 else word + " "
         return closes
 
     def _build_messages(self, turn_history: list[Turn]) -> list[dict]:
         """Convert the session Turn list to the OpenAI-compatible messages format."""
+        system_prompt = self._profile["system_prompt"] + "\n\nIMPORTANT: Always respond in English only, regardless of the language of the user's input."
         messages: list[dict] = [
-            {"role": "system", "content": self._profile["system_prompt"]}
+            {"role": "system", "content": system_prompt}
         ]
 
         # Prepend a kick-off if the first turn is from the opponent

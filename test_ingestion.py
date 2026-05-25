@@ -5,8 +5,9 @@ Run:
     python test_ingestion.py
     pytest test_ingestion.py -v
 
-If ANTHROPIC_API_KEY is not set, the Historical Record (parsing-only) assertions
-are verified and the LLM-dependent sections are skipped.
+Historical Record (parsing-only) tests run always — no Ollama required.
+LLM-dependent tests mock ollama.chat by default; live tests run when
+OLLAMA_LIVE=1 is set and Ollama is reachable.
 
 Transcript snippet: Brown v. Board of Education, Dec 9, 1952 (public domain).
 """
@@ -76,48 +77,15 @@ SAMPLE_PROFILE = {
 }
 
 
-# ── Parsing-only tests (no API key required) ───────────────────────────────────
+# ── Mock helper ────────────────────────────────────────────────────────────────
 
-def test_parsing_only():
-    """Verify Historical Record extraction without touching the API."""
-    record = extract_historical_record(TRANSCRIPT, LAWYER_NAME)
-
-    assert len(record) >= 3, (
-        f"Expected >= 3 turns for {LAWYER_NAME}, got {len(record)}"
-    )
-    for expected in EXPECTED_MARSHALL_TURNS:
-        assert expected in record, (
-            f"Expected turn not found verbatim in historical_record:\n{expected[:120]!r}"
-        )
-
-
-def test_parse_turns_finds_all_speakers():
-    """_parse_turns should identify all distinct speakers in the snippet."""
-    turns = _parse_turns(TRANSCRIPT)
-    speakers = {label for label, _ in turns}
-    assert "MR. MARSHALL" in speakers
-    assert "JUSTICE FRANKFURTER" in speakers
-    assert "JUSTICE DOUGLAS" in speakers
-
-
-def test_parse_turns_count():
-    """Transcript snippet has 9 speaker turns total."""
-    turns = _parse_turns(TRANSCRIPT)
-    assert len(turns) == 9
-
-
-# ── System prompt synthesis tests ─────────────────────────────────────────────
-
-def _make_mock_client(response_text: str):
-    """Return a mock anthropic.Anthropic client that returns response_text."""
-    mock_content = MagicMock()
-    mock_content.text = response_text
+def _make_mock_ollama_response(response_text: str):
+    """Return a mock ollama.chat() return value with .message.content."""
     mock_message = MagicMock()
-    mock_message.content = [mock_content]
-    mock_message.stop_reason = "end_turn"
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = mock_message
-    return mock_client
+    mock_message.content = response_text
+    mock_response = MagicMock()
+    mock_response.message = mock_message
+    return mock_response
 
 
 MOCK_SYSTEM_PROMPT = """\
@@ -148,34 +116,53 @@ Respond with ONLY a valid JSON object:
 """
 
 
+# ── Parsing-only tests (no API key required) ───────────────────────────────────
+
+def test_parsing_only():
+    """Verify Historical Record extraction without touching the LLM."""
+    record = extract_historical_record(TRANSCRIPT, LAWYER_NAME)
+
+    assert len(record) >= 3, (
+        f"Expected >= 3 turns for {LAWYER_NAME}, got {len(record)}"
+    )
+    for expected in EXPECTED_MARSHALL_TURNS:
+        assert expected in record, (
+            f"Expected turn not found verbatim in historical_record:\n{expected[:120]!r}"
+        )
+
+
+def test_parse_turns_finds_all_speakers():
+    """_parse_turns should identify all distinct speakers in the snippet."""
+    turns = _parse_turns(TRANSCRIPT)
+    speakers = {label for label, _ in turns}
+    assert "MR. MARSHALL" in speakers
+    assert "JUSTICE FRANKFURTER" in speakers
+    assert "JUSTICE DOUGLAS" in speakers
+
+
+def test_parse_turns_count():
+    """Transcript snippet has 9 speaker turns total."""
+    turns = _parse_turns(TRANSCRIPT)
+    assert len(turns) == 9
+
+
+# ── System prompt synthesis tests (ollama mocked) ─────────────────────────────
+
 def test_synthesize_system_prompt_contains_fields_mock():
     """
     synthesize_system_prompt produces a prompt containing all four profile fields
-    and the JSON output contract.  Uses a mock so no API key is needed.
+    and the JSON output contract. Uses a mock so Ollama need not be running.
     """
-    with patch("anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value = _make_mock_client(MOCK_SYSTEM_PROMPT)
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            result = synthesize_system_prompt(SAMPLE_PROFILE)
+    with patch("ollama.chat") as mock_chat:
+        mock_chat.return_value = _make_mock_ollama_response(MOCK_SYSTEM_PROMPT)
+        result = synthesize_system_prompt(SAMPLE_PROFILE)
 
     assert isinstance(result, str) and result.strip(), "Result must be a non-empty string"
-
-    # Each of the four behavioural field values must appear (or be paraphrased —
-    # we check key substrings that are in our mock response).
     assert "JUSTICE FRANKFURTER" in result, "Persona name must appear in system prompt"
-    assert "opposing" in result.lower(), (
-        "Persona role must be reflected in system prompt"
-    )
+    assert "opposing" in result.lower(), "Persona role must be reflected in system prompt"
+    assert '"response"' in result, 'System prompt must contain the JSON output contract with "response" key'
+    assert '"closes"' in result or "closes" in result, "System prompt must contain the closes field reference"
 
-    # Check JSON output contract
-    assert '"response"' in result, (
-        'System prompt must contain the JSON output contract with "response" key'
-    )
-    assert '"closes"' in result or "closes" in result, (
-        "System prompt must contain the closes field reference"
-    )
-
-    # Check no-meta-commentary constraint (ADR 0001)
     lower = result.lower()
     assert any(phrase in lower for phrase in ["never", "not", "no "]), (
         "System prompt must include a prohibition (never score/rate/break character)"
@@ -183,58 +170,41 @@ def test_synthesize_system_prompt_contains_fields_mock():
 
 
 def test_synthesize_system_prompt_contains_profile_values_mock():
-    """
-    The generated system prompt must incorporate the four profile field values.
-    """
-    # The mock system prompt includes the actual field content from SAMPLE_PROFILE.
-    with patch("anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value = _make_mock_client(MOCK_SYSTEM_PROMPT)
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            result = synthesize_system_prompt(SAMPLE_PROFILE)
+    """The generated system prompt must incorporate the four profile field values."""
+    with patch("ollama.chat") as mock_chat:
+        mock_chat.return_value = _make_mock_ollama_response(MOCK_SYSTEM_PROMPT)
+        result = synthesize_system_prompt(SAMPLE_PROFILE)
 
-    # Spot-check distinctive substrings from each profile field.
-    assert "doctrinal" in result.lower(), (
-        "argumentation_patterns content expected in system prompt"
-    )
-    assert "limiting principle" in result.lower(), (
-        "signature_questions_or_objections content expected in system prompt"
-    )
-    assert "socratic" in result.lower(), (
-        "rhetorical_habits content expected in system prompt"
-    )
-    assert "professorial" in result.lower(), (
-        "tone_and_cadence content expected in system prompt"
-    )
+    assert "doctrinal" in result.lower(), "argumentation_patterns content expected in system prompt"
+    assert "limiting principle" in result.lower(), "signature_questions_or_objections content expected in system prompt"
+    assert "socratic" in result.lower(), "rhetorical_habits content expected in system prompt"
+    assert "professorial" in result.lower(), "tone_and_cadence content expected in system prompt"
 
 
 def test_synthesize_system_prompt_missing_key_raises():
-    """
-    If the API returns a response without the JSON contract, raise ValueError.
-    """
+    """If the LLM returns a response without the JSON contract, raise ValueError."""
     bad_response = "You are Justice Frankfurter. Ask hard questions."
-    with patch("anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value = _make_mock_client(bad_response)
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-            with pytest.raises(ValueError, match="JSON output contract"):
-                synthesize_system_prompt(SAMPLE_PROFILE)
-
-
-def test_synthesize_system_prompt_no_api_key():
-    """synthesize_system_prompt raises EnvironmentError when key is absent."""
-    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-    with patch.dict(os.environ, env, clear=True):
-        with pytest.raises(EnvironmentError, match="ANTHROPIC_API_KEY"):
+    with patch("ollama.chat") as mock_chat:
+        mock_chat.return_value = _make_mock_ollama_response(bad_response)
+        with pytest.raises(ValueError, match="JSON output contract"):
             synthesize_system_prompt(SAMPLE_PROFILE)
 
 
-# ── Live tests (require ANTHROPIC_API_KEY) ─────────────────────────────────────
+def test_synthesize_system_prompt_ollama_unavailable():
+    """If ollama raises a connection error, it propagates out of synthesize_system_prompt."""
+    with patch("ollama.chat", side_effect=Exception("connection refused")):
+        with pytest.raises(Exception, match="connection refused"):
+            synthesize_system_prompt(SAMPLE_PROFILE)
+
+
+# ── Live tests (require Ollama running locally) ────────────────────────────────
 
 @pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY"),
-    reason="needs ANTHROPIC_API_KEY",
+    not os.getenv("OLLAMA_LIVE"),
+    reason="set OLLAMA_LIVE=1 with Ollama running to enable live tests",
 )
 def test_full_ingestion_live():
-    """Run the full pipeline (parsing + LLM profile extraction)."""
+    """Run the full pipeline (parsing + Ollama profile extraction)."""
     result = ingest_transcript(TRANSCRIPT, LAWYER_NAME, OPPOSING_NAME)
 
     record = result["historical_record"]
@@ -253,8 +223,8 @@ def test_full_ingestion_live():
 
 
 @pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY"),
-    reason="needs ANTHROPIC_API_KEY",
+    not os.getenv("OLLAMA_LIVE"),
+    reason="set OLLAMA_LIVE=1 with Ollama running to enable live tests",
 )
 def test_synthesize_system_prompt_synthesis_live():
     """
@@ -271,16 +241,14 @@ def test_synthesize_system_prompt_synthesis_live():
         "Generated system prompt must reference the persona name"
     )
     for field in PROFILE_FIELDS:
-        # Each field value was passed to the LLM — some substring should appear
         field_value = SAMPLE_PROFILE[field]
-        # We check a 20-char substring to tolerate minor paraphrasing
         snippet = field_value[:20]
         assert snippet in result or field_value.split()[0] in result, (
             f"Profile field '{field}' value not reflected in generated system prompt"
         )
 
 
-# ── Legacy standalone runner (kept for backwards compatibility) ─────────────────
+# ── Legacy standalone runner ────────────────────────────────────────────────────
 
 def _run_legacy():
     """Run parsing-only test then optionally the full ingestion."""
@@ -300,17 +268,16 @@ def _run_legacy():
     print(f"[PASS] Historical Record has {len(record)} turn(s) (>= 3 required)")
     print(f"[PASS] All {len(EXPECTED_MARSHALL_TURNS)} expected turns appear verbatim")
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
+    if not os.getenv("OLLAMA_LIVE"):
         print(
-            "\n[SKIP] ANTHROPIC_API_KEY is not set — skipping LLM tests.\n"
-            "       Set the environment variable and re-run to test the full pipeline."
+            "\n[SKIP] OLLAMA_LIVE is not set — skipping live LLM tests.\n"
+            "       Set OLLAMA_LIVE=1 with Ollama running to test the full pipeline."
         )
         print("\nAll parsing assertions PASSED.")
         sys.exit(0)
 
     print("\n" + "=" * 60)
-    print("PART 2 — Full ingestion (parsing + LLM profile)")
+    print("PART 2 — Full ingestion (parsing + Ollama profile)")
     print("=" * 60)
 
     result = ingest_transcript(TRANSCRIPT, LAWYER_NAME, OPPOSING_NAME)
@@ -327,7 +294,6 @@ def _run_legacy():
         value = profile.get(field_name)
         assert isinstance(value, str) and value.strip()
     print(f"[PASS] All 5 profile fields are non-empty strings for '{OPPOSING_NAME}'")
-
     print("\nAll assertions PASSED.")
 
 

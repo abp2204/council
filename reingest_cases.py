@@ -1,20 +1,17 @@
 """
 COUNCIL — Re-ingest existing cases with synthesized system prompts.
 
-Run this script after setting ANTHROPIC_API_KEY to replace the hand-authored
-system prompts in brown.json and gideon.json with LLM-synthesized ones derived
-from each case's existing Profile data.
+Run this script to replace the hand-authored system prompts in brown.json
+and gideon.json with LLM-synthesized ones derived from each case's existing
+Profile data. Uses local Ollama (qwen2.5:14b) — no API key required.
 
 Usage:
     python3 reingest_cases.py
 
-The script reads the existing case JSON, synthesizes a new system_prompt from
-the opposing_role data (treated as the Profile), writes the result in-place,
-and prints a confirmation.
+Requires Ollama running locally: ollama serve
 """
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -36,10 +33,6 @@ PROFILE_FIELDS = [
 
 
 def _opposing_role_to_profile(opposing_role: dict) -> dict:
-    """
-    Build a Profile dict from an existing opposing_role block.
-    The opposing_role stores the same behavioural fields as the Profile.
-    """
     profile = {
         "name": opposing_role["name"],
         "role": "opposing",
@@ -79,17 +72,8 @@ def reingest(case_id: str) -> None:
 
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print(
-            "ERROR: ANTHROPIC_API_KEY is not set. "
-            "Set it and re-run this script to synthesize system prompts.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     for case_id in CASES:
         reingest(case_id)
-
     print("\nRe-ingestion complete.")
 
 

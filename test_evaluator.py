@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import pytest
+from domain import Turn
 
 def _ollama_running() -> bool:
     try:
@@ -28,113 +29,77 @@ _needs_ollama = pytest.mark.skipif(
 
 # ── Mock Transcripts ──────────────────────────────────────────────────────────
 
-WEAK_SESSION: list[dict] = [
-    {
-        "speaker": "opponent",
-        "text": (
-            "Mr. Marshall, suppose we agree that segregation causes psychological harm — "
-            "does that mean any state classification by race is per se unconstitutional, "
-            "or only this one?"
-        ),
-    },
-    {
-        "speaker": "user",
-        "text": (
-            "The Fifth Amendment's due process clause explicitly prohibits racial "
-            "segregation in public schools — this Court held as much in Marbury v. Madison."
-        ),
-    },
-    {
-        "speaker": "opponent",
-        "text": (
-            "But Plessy v. Ferguson is on the books. You're asking us to overrule a "
-            "56-year-old precedent. On what authority do we do that short of a "
-            "constitutional amendment?"
-        ),
-    },
-    {
-        "speaker": "user",
-        "text": (
-            "Plessy v. Ferguson was decided in 1920 and has been widely criticized by "
-            "every subsequent court. The Brown precedent itself supports our position."
-        ),
-    },
-    {
-        "speaker": "opponent",
-        "text": (
-            "You're telling me the intent of the Framers of the Fourteenth Amendment "
-            "was to desegregate public schools — but the Congress that ratified the "
-            "amendment also funded segregated schools in the District of Columbia. "
-            "How do you reconcile that?"
-        ),
-    },
-    {
-        "speaker": "user",
-        "text": (
-            "The framers of the Fourteenth Amendment specifically debated school "
-            "segregation in the congressional record and voted to prohibit it by "
-            "a margin of thirty to two."
-        ),
-    },
+WEAK_SESSION: list[Turn] = [
+    Turn(role="opponent", text=(
+        "Mr. Marshall, suppose we agree that segregation causes psychological harm — "
+        "does that mean any state classification by race is per se unconstitutional, "
+        "or only this one?"
+    )),
+    Turn(role="user", text=(
+        "The Fifth Amendment's due process clause explicitly prohibits racial "
+        "segregation in public schools — this Court held as much in Marbury v. Madison."
+    )),
+    Turn(role="opponent", text=(
+        "But Plessy v. Ferguson is on the books. You're asking us to overrule a "
+        "56-year-old precedent. On what authority do we do that short of a "
+        "constitutional amendment?"
+    )),
+    Turn(role="user", text=(
+        "Plessy v. Ferguson was decided in 1920 and has been widely criticized by "
+        "every subsequent court. The Brown precedent itself supports our position."
+    )),
+    Turn(role="opponent", text=(
+        "You're telling me the intent of the Framers of the Fourteenth Amendment "
+        "was to desegregate public schools — but the Congress that ratified the "
+        "amendment also funded segregated schools in the District of Columbia. "
+        "How do you reconcile that?"
+    )),
+    Turn(role="user", text=(
+        "The framers of the Fourteenth Amendment specifically debated school "
+        "segregation in the congressional record and voted to prohibit it by "
+        "a margin of thirty to two."
+    )),
 ]
 
-STRONG_SESSION: list[dict] = [
-    {
-        "speaker": "opponent",
-        "text": (
-            "Mr. Marshall, suppose we agree that segregation causes psychological harm — "
-            "does that mean any state classification by race is per se unconstitutional, "
-            "or only this one?"
-        ),
-    },
-    {
-        "speaker": "user",
-        "text": (
-            "The evidence before this Court includes the work of Dr. Kenneth Clark, "
-            "whose studies show that Black children in segregated schools internalize "
-            "a sense of inferiority. That is not conjecture — it is documented "
-            "psychological harm caused directly by state action. And under the Equal "
-            "Protection Clause, the state may not impose a badge of inferiority on any "
-            "class of citizens."
-        ),
-    },
-    {
-        "speaker": "opponent",
-        "text": (
-            "But Plessy v. Ferguson is on the books. You're asking us to overrule a "
-            "56-year-old precedent. On what authority do we do that short of a "
-            "constitutional amendment?"
-        ),
-    },
-    {
-        "speaker": "user",
-        "text": (
-            "This Court has previously held that separate facilities are inherently "
-            "unequal in the context of graduate education — McLaurin v. Oklahoma and "
-            "Sweatt v. Painter. The principle does not stop at graduate school. The "
-            "Equal Protection Clause applies wherever the state segregates, and Plessy "
-            "cannot survive that reading. Longevity does not cure a constitutional error."
-        ),
-    },
-    {
-        "speaker": "opponent",
-        "text": (
-            "You're telling me the intent of the Framers of the Fourteenth Amendment "
-            "was to desegregate public schools — but the Congress that ratified the "
-            "amendment also funded segregated schools in the District of Columbia. "
-            "How do you reconcile that?"
-        ),
-    },
-    {
-        "speaker": "user",
-        "text": (
-            "The DC argument only reinforces our position: if Congress itself violated "
-            "the Fourteenth Amendment by funding segregated schools, this Court should "
-            "say so — and say so clearly — rather than use that constitutional failure "
-            "to justify more of the same. The Amendment's text controls, not the "
-            "practice of those who fell short of its guarantee."
-        ),
-    },
+STRONG_SESSION: list[Turn] = [
+    Turn(role="opponent", text=(
+        "Mr. Marshall, suppose we agree that segregation causes psychological harm — "
+        "does that mean any state classification by race is per se unconstitutional, "
+        "or only this one?"
+    )),
+    Turn(role="user", text=(
+        "The evidence before this Court includes the work of Dr. Kenneth Clark, "
+        "whose studies show that Black children in segregated schools internalize "
+        "a sense of inferiority. That is not conjecture — it is documented "
+        "psychological harm caused directly by state action. And under the Equal "
+        "Protection Clause, the state may not impose a badge of inferiority on any "
+        "class of citizens."
+    )),
+    Turn(role="opponent", text=(
+        "But Plessy v. Ferguson is on the books. You're asking us to overrule a "
+        "56-year-old precedent. On what authority do we do that short of a "
+        "constitutional amendment?"
+    )),
+    Turn(role="user", text=(
+        "This Court has previously held that separate facilities are inherently "
+        "unequal in the context of graduate education — McLaurin v. Oklahoma and "
+        "Sweatt v. Painter. The principle does not stop at graduate school. The "
+        "Equal Protection Clause applies wherever the state segregates, and Plessy "
+        "cannot survive that reading. Longevity does not cure a constitutional error."
+    )),
+    Turn(role="opponent", text=(
+        "You're telling me the intent of the Framers of the Fourteenth Amendment "
+        "was to desegregate public schools — but the Congress that ratified the "
+        "amendment also funded segregated schools in the District of Columbia. "
+        "How do you reconcile that?"
+    )),
+    Turn(role="user", text=(
+        "The DC argument only reinforces our position: if Congress itself violated "
+        "the Fourteenth Amendment by funding segregated schools, this Court should "
+        "say so — and say so clearly — rather than use that constitutional failure "
+        "to justify more of the same. The Amendment's text controls, not the "
+        "practice of those who fell short of its guarantee."
+    )),
 ]
 
 HISTORICAL_RECORD = [
@@ -146,13 +111,13 @@ HISTORICAL_RECORD = [
     "Sweatt v. Painter (1950) required the University of Texas Law School to admit a Black applicant.",
 ]
 
-MINIMAL_TRANSCRIPT: list[dict] = [
-    {"speaker": "opponent", "text": "What is your central argument here?"},
-    {"speaker": "user", "text": "The Equal Protection Clause prohibits state-enforced racial segregation in public schools."},
-    {"speaker": "opponent", "text": "How do you distinguish Plessy v. Ferguson?"},
-    {"speaker": "user", "text": "Plessy relied on a fiction of equality that the record before this Court disproves."},
-    {"speaker": "opponent", "text": "What remedy do you seek?"},
-    {"speaker": "user", "text": "We seek a declaration that segregated schools are unconstitutional and an order to desegregate."},
+MINIMAL_TRANSCRIPT: list[Turn] = [
+    Turn(role="opponent", text="What is your central argument here?"),
+    Turn(role="user", text="The Equal Protection Clause prohibits state-enforced racial segregation in public schools."),
+    Turn(role="opponent", text="How do you distinguish Plessy v. Ferguson?"),
+    Turn(role="user", text="Plessy relied on a fiction of equality that the record before this Court disproves."),
+    Turn(role="opponent", text="What remedy do you seek?"),
+    Turn(role="user", text="We seek a declaration that segregated schools are unconstitutional and an order to desegregate."),
 ]
 
 
@@ -189,7 +154,7 @@ def test_key_moment_user_text_is_substring_of_user_turn():
     evaluator = EvaluatorRole()
     score = evaluator.evaluate(MINIMAL_TRANSCRIPT, historical_record=HISTORICAL_RECORD)
 
-    user_texts = [t["text"] for t in MINIMAL_TRANSCRIPT if t["speaker"] == "user"]
+    user_texts = [t.text for t in MINIMAL_TRANSCRIPT if t.role == "user"]
 
     for km in score.key_moments:
         assert km.user_text, f"key_moment.user_text is empty for turn {km.turn_number}"
@@ -282,9 +247,9 @@ class TestParseScore:
         evaluator = EvaluatorRole.__new__(EvaluatorRole)
 
         transcript = [
-            {"speaker": "user", "text": "My argument about equal protection."},
-            {"speaker": "user", "text": "Furthermore, Plessy must be overruled."},
-            {"speaker": "user", "text": "The Constitution demands desegregation."},
+            Turn(role="user", text="My argument about equal protection."),
+            Turn(role="user", text="Furthermore, Plessy must be overruled."),
+            Turn(role="user", text="The Constitution demands desegregation."),
         ]
 
         raw_json = """{

@@ -1,20 +1,11 @@
 """
-COUNCIL — STT Layer (Issue #7)
+COUNCIL — STT Layer
 
-Voice-to-text transcription as the primary Move input modality.
-Uses local OpenAI Whisper (runs on-device, no API key required).
-
-Primary input path (IN_SESSION):
-    1. User presses ENTER → recording starts
-    2. User presses ENTER again → recording stops, transcription begins
-    3. Plain text flows into the Move pipeline unchanged
-
-Text fallback: "> <text>" syntax in the REPL (always available).
+Voice-to-text transcription using faster-whisper (local inference).
+Model runs on CPU by default; set WHISPER_DEVICE=cuda for GPU acceleration.
 """
 
 import io
-import os
-import tempfile
 import wave
 
 try:
@@ -24,36 +15,27 @@ try:
 except ImportError:
     VOICE_AVAILABLE = False
 
-try:
-    import whisper as _whisper
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-
 SAMPLE_RATE = 16_000
 CHANNELS = 1
-_WHISPER_MODEL_NAME = "base"
 
-_whisper_model = None
+_model = None
 
 
 def _get_model():
-    global _whisper_model
-    if _whisper_model is None:
-        if not WHISPER_AVAILABLE:
-            raise RuntimeError(
-                "openai-whisper not installed. Run: pip install openai-whisper"
-            )
-        _whisper_model = _whisper.load_model(_WHISPER_MODEL_NAME)
-    return _whisper_model
+    global _model
+    if _model is None:
+        import os
+        from faster_whisper import WhisperModel
+
+        model_size = os.environ.get("WHISPER_MODEL", "large-v3-turbo")
+        device = os.environ.get("WHISPER_DEVICE", "cpu")
+        compute_type = "float16" if device == "cuda" else "int8"
+        _model = WhisperModel(model_size, device=device, compute_type=compute_type)
+    return _model
 
 
 def record_until_enter(sample_rate: int = SAMPLE_RATE) -> bytes:
-    """Record from the microphone until the user presses Enter.
-
-    Returns WAV bytes (16-bit mono, 16 kHz) ready for Whisper transcription.
-    Raises RuntimeError if sounddevice/numpy are not installed.
-    """
+    """Record from the microphone until the user presses Enter. Returns WAV bytes."""
     if not VOICE_AVAILABLE:
         raise RuntimeError(
             "sounddevice / numpy not installed. "
@@ -69,7 +51,7 @@ def record_until_enter(sample_rate: int = SAMPLE_RATE) -> bytes:
     with sd.InputStream(
         samplerate=sample_rate, channels=CHANNELS, dtype="int16", callback=_callback
     ):
-        input()  # blocks main thread; InputStream callback runs in C thread
+        input()
 
     if not frames:
         return b""
@@ -85,21 +67,15 @@ def record_until_enter(sample_rate: int = SAMPLE_RATE) -> bytes:
 
 
 def transcribe(audio_bytes: bytes) -> str:
-    """Transcribe WAV bytes via local Whisper. Returns plain text."""
+    """Transcribe audio bytes via faster-whisper (local). Returns plain text."""
     if not audio_bytes:
         return ""
 
+    import io as _io
     model = _get_model()
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = tmp.name
-
-    try:
-        result = model.transcribe(tmp_path)
-        return result["text"].strip()
-    finally:
-        os.unlink(tmp_path)
+    audio_file = _io.BytesIO(audio_bytes)
+    segments, _ = model.transcribe(audio_file, beam_size=5)
+    return " ".join(seg.text for seg in segments).strip()
 
 
 def record_and_transcribe() -> str:

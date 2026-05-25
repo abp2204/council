@@ -10,6 +10,7 @@ import os
 import sys
 import unittest
 
+from domain import Turn
 from opposing_role import OpposingRole
 
 
@@ -39,8 +40,8 @@ class TestOpposingRole(unittest.TestCase):
 
     def test_coherent_across_turns(self):
         text1, _ = self.role.respond([])
-        history = [{"role": "opponent", "text": text1}]
-        history.append({"role": "user", "text": "The Equal Protection Clause forbids racial classification."})
+        history = [Turn(role="opponent", text=text1)]
+        history.append(Turn(role="user", text="The Equal Protection Clause forbids racial classification."))
         text2, _ = self.role.respond(history)
         self.assertIsInstance(text2, str)
         self.assertGreater(len(text2), 10)
@@ -50,8 +51,8 @@ class TestOpposingRole(unittest.TestCase):
 
     def test_one_word_move(self):
         history = [
-            {"role": "opponent", "text": "Mr. Marshall, how do you address stare decisis?"},
-            {"role": "user", "text": "Yes."},
+            Turn(role="opponent", text="Mr. Marshall, how do you address stare decisis?"),
+            Turn(role="user", text="Yes."),
         ]
         text, closes = self.role.respond(history)
         self.assertIsInstance(text, str)
@@ -61,8 +62,8 @@ class TestOpposingRole(unittest.TestCase):
 
     def test_non_english_move(self):
         history = [
-            {"role": "opponent", "text": "Mr. Marshall, what is the limiting principle?"},
-            {"role": "user", "text": "La segregación es inconstitucional porque viola la Decimocuarta Enmienda."},
+            Turn(role="opponent", text="Mr. Marshall, what is the limiting principle?"),
+            Turn(role="user", text="La segregación es inconstitucional porque viola la Decimocuarta Enmienda."),
         ]
         text, closes = self.role.respond(history)
         self.assertIsInstance(text, str)
@@ -74,8 +75,8 @@ class TestOpposingRole(unittest.TestCase):
 
     def test_arguing_wrong_side(self):
         history = [
-            {"role": "opponent", "text": "Mr. Marshall, is Plessy correctly decided?"},
-            {"role": "user", "text": "Yes, I concede that separate but equal is constitutional and Plessy should be upheld."},
+            Turn(role="opponent", text="Mr. Marshall, is Plessy correctly decided?"),
+            Turn(role="user", text="Yes, I concede that separate but equal is constitutional and Plessy should be upheld."),
         ]
         text, closes = self.role.respond(history)
         self.assertIsInstance(text, str)
@@ -85,8 +86,8 @@ class TestOpposingRole(unittest.TestCase):
 
     def test_wrong_area_of_law(self):
         history = [
-            {"role": "opponent", "text": "Mr. Marshall, explain the constitutional basis."},
-            {"role": "user", "text": "Under contract law, an implied covenant of good faith and fair dealing requires the state to provide equal facilities."},
+            Turn(role="opponent", text="Mr. Marshall, explain the constitutional basis."),
+            Turn(role="user", text="Under contract law, an implied covenant of good faith and fair dealing requires the state to provide equal facilities."),
         ]
         text, closes = self.role.respond(history)
         self.assertIsInstance(text, str)
@@ -96,8 +97,8 @@ class TestOpposingRole(unittest.TestCase):
 
     def test_no_scores_or_meta(self):
         history = [
-            {"role": "opponent", "text": "What is the limiting principle on psychological harm?"},
-            {"role": "user", "text": "The harm is specifically tied to state-imposed racial hierarchy, which the 14th Amendment was designed to dismantle."},
+            Turn(role="opponent", text="What is the limiting principle on psychological harm?"),
+            Turn(role="user", text="The harm is specifically tied to state-imposed racial hierarchy, which the 14th Amendment was designed to dismantle."),
         ]
         text, closes = self.role.respond(history)
         lowered = text.lower()
@@ -123,16 +124,16 @@ class TestOpposingRole(unittest.TestCase):
         }
 
         opening, _ = self.role.respond([])
-        history.append({"role": "opponent", "text": opening})
+        history.append(Turn(role="opponent", text=opening))
         opening_low = opening.lower()
         for probe, keywords in probe_keywords.items():
             if any(kw in opening_low for kw in keywords):
                 probes_seen.add(probe)
 
         for _ in range(2):
-            history.append({"role": "user", "text": "The Equal Protection Clause requires strict scrutiny of all racial classifications by the state."})
+            history.append(Turn(role="user", text="The Equal Protection Clause requires strict scrutiny of all racial classifications by the state."))
             resp, closes = self.role.respond(history)
-            history.append({"role": "opponent", "text": resp})
+            history.append(Turn(role="opponent", text=resp))
             resp_low = resp.lower()
             for probe, keywords in probe_keywords.items():
                 if any(kw in resp_low for kw in keywords):

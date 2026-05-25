@@ -54,8 +54,8 @@ async def stream_response(session_id: str):
         while True:
             item = await queue.get()
             if isinstance(item, dict) and item.get("__done__"):
-                engine.commit_response(session_id, item["text"], item["closes"])
-                yield {"data": json.dumps({"type": "done", "closes": item["closes"]})}
+                actually_closes = engine.commit_response(session_id, item["text"], item["closes"])
+                yield {"data": json.dumps({"type": "done", "closes": actually_closes})}
                 break
             yield {"data": item}
 

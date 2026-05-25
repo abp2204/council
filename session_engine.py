@@ -96,7 +96,7 @@ class MockOpposingRole:
         self._probe_index = 0
         self._probes_completed = False
 
-    def respond(self, user_text: str, turns: list[Turn]) -> dict:
+    def respond(self, turns: list[Turn]) -> tuple[str, bool]:
         user_turns = [t for t in turns if t.role == "user"]
         n = len(user_turns)
 
@@ -104,7 +104,7 @@ class MockOpposingRole:
             self._probes_completed = True
 
         if self._probes_completed and n >= 3:
-            return {"response": self._close, "closes": True}
+            return self._close, True
 
         response = self._probes[self._probe_index % len(self._probes)]
         self._probe_index += 1
@@ -113,7 +113,15 @@ class MockOpposingRole:
             self._probes_completed = True
 
         closes = self._probes_completed and n >= 3
-        return {"response": response, "closes": closes}
+        return response, closes
+
+    def respond_stream(self, turns: list[Turn]):
+        """Stream mock response word-by-word; return closes via StopIteration.value."""
+        text, closes = self.respond(turns)
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            yield word if i == len(words) - 1 else word + " "
+        return closes
 
 
 class MockEvaluator:
@@ -198,10 +206,9 @@ class SessionEngine:
         case = load_case(case_id)
         opposing_role = self._opposing_role_factory(case)
 
-        first_response = opposing_role.respond("", [])
+        opening_text, _ = opposing_role.respond([])
 
         session_id = str(uuid.uuid4())
-        opening_text = first_response["response"]
         s = _SessionState(
             state=State.IN_SESSION,
             case_id=case_id,
@@ -238,13 +245,20 @@ class SessionEngine:
         s.turns.append(Turn(role="user", text=text, deviation=deviation))
         return deviation
 
-    def commit_response(self, session_id: str, response_text: str, closes: bool) -> None:
-        """Append the Opposing Role's response and advance state if the session closes."""
+    MAX_USER_TURNS = 7
+
+    def commit_response(self, session_id: str, response_text: str, closes: bool) -> bool:
+        """
+        Append the Opposing Role's response and advance state if the session closes.
+        Returns True if the session is now SESSION_END (for any reason).
+        """
         s = self._get_session(session_id)
         s.turns.append(Turn(role="opponent", text=response_text))
         s.last_response = response_text
-        if closes:
+        user_turns = sum(1 for t in s.turns if t.role == "user")
+        if closes or user_turns >= self.MAX_USER_TURNS:
             s.state = State.SESSION_END
+        return s.state == State.SESSION_END
 
     def submit_move(self, session_id: str, text: str) -> MoveResult:
         s = self._get_session(session_id)
@@ -261,16 +275,16 @@ class SessionEngine:
 
         s.turns.append(Turn(role="user", text=text, deviation=deviation))
 
-        opp_result = s.opposing_role.respond(text, s.turns)
-        s.turns.append(Turn(role="opponent", text=opp_result["response"]))
-        s.last_response = opp_result["response"]
+        opp_text, opp_closes = s.opposing_role.respond(s.turns)
+        s.turns.append(Turn(role="opponent", text=opp_text))
+        s.last_response = opp_text
 
-        if opp_result["closes"]:
+        if opp_closes:
             s.state = State.SESSION_END
 
         return MoveResult(
-            response=opp_result["response"],
-            closes=opp_result["closes"],
+            response=opp_text,
+            closes=opp_closes,
             deviation=deviation,
         )
 
