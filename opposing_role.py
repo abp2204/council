@@ -17,6 +17,8 @@ Usage:
 
 import json
 import re
+from collections.abc import Generator
+from typing import Protocol
 
 import ollama
 
@@ -24,50 +26,113 @@ from case_library import load_case
 from domain import Turn
 
 
+# ── Protocol ──────────────────────────────────────────────────────────────────
+
+
+class OpposingRoleProtocol(Protocol):
+    """
+    Formal contract for all OpposingRole implementations.
+
+    Any object satisfying this Protocol can be used wherever an Opposing Role
+    is expected — real (LLM-backed) or mock (test/offline).
+    """
+
+    def respond(self, turns: list[Turn]) -> tuple[str, bool]:
+        """
+        Generate the next Opposing Role line.
+
+        Returns (response_text, closes) where closes signals that the session
+        should end after this response.
+        """
+        ...
+
+    def respond_stream(self, turns: list[Turn]) -> Generator[str, None, bool]:
+        """
+        Stream the response word-by-word.
+
+        Yields word tokens. The generator's return value (accessible via
+        StopIteration.value) carries the closes boolean.
+        """
+        ...
+
+
+# ── Mock ──────────────────────────────────────────────────────────────────────
+
+
 class MockOpposingRole:
     """
-    Offline opponent for development and demo — no API key required.
+    Offline opponent for development, testing, and demo — no API key required.
 
-    Cycles through the three canonical probes, handles edge cases in character,
-    and closes naturally after all probes have been asked.
+    Accepts either a case_id (loads probes from the case library) or explicit
+    mock_probes/mock_close lists (used by test fixtures). Cycles through the
+    canonical probes in order, handles edge cases in character, and closes
+    naturally once all probes have been delivered and enough user turns have
+    accumulated.
+
+    Instance is per-session; do not share across sessions.
     """
 
-    def __init__(self, case_id: str) -> None:
-        case = load_case(case_id, operator=True)
-        opp = case["opposing_role"]
-        self._mock_probes: list[str] = opp["mock_probes"]
-        self._mock_close: str = opp["mock_close"]
-        self._probes_asked: list[int] = []
-        user_role = case.get("user_role", "")
-        self._addressee: str = user_role.split()[1] if " " in user_role else "Counsel"
+    def __init__(
+        self,
+        case_id: str | None = None,
+        *,
+        mock_probes: list[str] | None = None,
+        mock_close: str | None = None,
+    ) -> None:
+        if case_id is not None:
+            case = load_case(case_id, operator=True)
+            opp = case["opposing_role"]
+            self._mock_probes: list[str] = opp["mock_probes"]
+            self._mock_close: str = opp["mock_close"]
+            user_role = case.get("user_role", "")
+            self._addressee: str = user_role.split()[1] if " " in user_role else "Counsel"
+        else:
+            if not mock_probes:
+                raise ValueError("mock_probes must be a non-empty list when case_id is not given")
+            if mock_close is None:
+                raise ValueError("mock_close is required when case_id is not given")
+            self._mock_probes = mock_probes
+            self._mock_close = mock_close
+            self._addressee = "Counsel"
 
-    def respond(self, turn_history: list[Turn]) -> tuple[str, bool]:
-        user_turns = [t for t in turn_history if t.role == "user"]
+        self._probe_index: int = 0
+        self._probes_completed: bool = False
+
+    def respond(self, turns: list[Turn]) -> tuple[str, bool]:
+        user_turns = [t for t in turns if t.role == "user"]
         n = len(user_turns)
 
-        # Close after 3 user turns regardless — ensures test runner always gets a score
-        if n >= 3:
+        if not self._probes_completed and self._probe_index >= len(self._mock_probes):
+            self._probes_completed = True
+
+        # Close once all probes have been asked and there are enough user turns
+        if self._probes_completed and n >= 3:
             return self._mock_close, True
 
         # Edge-case detection on the most recent user turn
         if user_turns:
             last = user_turns[-1].text
-            response = self._edge_case_response(last)
-            if response:
-                return response, False
+            edge = self._edge_case_response(last)
+            if edge:
+                return edge, False
 
-        # Pick the next probe that hasn't been asked yet
-        for i, probe in enumerate(self._mock_probes):
-            if i not in self._probes_asked:
-                self._probes_asked.append(i)
-                return probe, False
+        # Pick the next probe in sequence
+        response = self._mock_probes[self._probe_index % len(self._mock_probes)]
+        self._probe_index += 1
 
-        # All probes asked but not enough user turns yet — press on the last one
-        return (
-            f"Mr. {self._addressee}, you have not yet given me a satisfactory answer. "
-            "Let me put the question again: " + self._mock_probes[self._probes_asked[-1]],
-            False,
-        )
+        if self._probe_index >= len(self._mock_probes):
+            self._probes_completed = True
+
+        closes = self._probes_completed and n >= 3
+        return response, closes
+
+    def respond_stream(self, turns: list[Turn]) -> Generator[str, None, bool]:
+        """Stream mock response word-by-word; return closes via StopIteration.value."""
+        text, closes = self.respond(turns)
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            yield word if i == len(words) - 1 else word + " "
+        return closes
 
     def _edge_case_response(self, text: str) -> str | None:
         words = text.split()
