@@ -117,6 +117,116 @@ The "key_moments" array must contain between 3 and 5 objects.
 """
 
 
+# ── Public Parse Function ─────────────────────────────────────────────────────
+
+
+def parse_score(raw: str, turns: list[Turn]) -> Score:
+    """
+    Parse an LLM JSON response string into a Score dataclass.
+
+    Takes the raw text returned by the evaluator model and the session's Turn
+    list (used to recover missing user_text fields and clamp turn numbers).
+    Handles JSON parse errors gracefully by returning a fallback Score.
+
+    Args:
+        raw: Raw string from the LLM response (may contain markdown fences).
+        turns: The session's Turn list; used to resolve user turn text.
+
+    Returns:
+        A fully populated Score with 3–5 KeyMoment objects.
+    """
+    cleaned = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
+    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
+    cleaned = cleaned.strip()
+
+    user_texts: list[str] = [t.text for t in turns if t.role == "user"]
+
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        return Score(
+            legal_soundness=50,
+            strategic_effectiveness=50,
+            creativity=50,
+            key_moments=[
+                KeyMoment(
+                    turn=1,
+                    label="deviation_point",
+                    user_text="(parse error — see evaluator logs)",
+                    commentary=(
+                        f"The evaluator could not parse its own response. "
+                        f"Raw output starts with: {raw[:120]!r}. "
+                        f"JSONDecodeError: {exc}"
+                    ),
+                ),
+                KeyMoment(
+                    turn=1,
+                    label="best_move",
+                    user_text="(parse error fallback)",
+                    commentary="Evaluator parse error; scores are neutral defaults.",
+                ),
+                KeyMoment(
+                    turn=1,
+                    label="worst_move",
+                    user_text="(parse error fallback)",
+                    commentary="Evaluator parse error; scores are neutral defaults.",
+                ),
+            ],
+        )
+
+    def _safe_score(val, default: int = 50) -> int:
+        return max(0, min(100, int(val if val is not None else default)))
+
+    legal_soundness = _safe_score(data.get("legal_soundness"))
+    strategic_effectiveness = _safe_score(data.get("strategic_effectiveness"))
+    creativity = _safe_score(data.get("creativity"))
+
+    key_moments: list[KeyMoment] = []
+    for km in data.get("key_moments", []):
+        raw_turn = km.get("turn_number", 1)
+        turn_number = int(raw_turn if raw_turn is not None else 1)
+        label = km.get("label", "deviation_point")
+        user_text = km.get("user_text", "")
+        commentary = km.get("commentary", "")
+
+        if not user_text and 1 <= turn_number <= len(user_texts):
+            user_text = user_texts[turn_number - 1]
+
+        turn_number = max(1, min(turn_number, max(len(user_texts), 1)))
+
+        if label not in ("best_move", "worst_move", "deviation_point"):
+            label = "deviation_point"
+
+        key_moments.append(
+            KeyMoment(
+                turn=turn_number,
+                label=label,
+                user_text=user_text,
+                commentary=commentary,
+            )
+        )
+
+    key_moments = key_moments[:5]
+    while len(key_moments) < 3:
+        fallback_turn = len(key_moments) + 1
+        fallback_text = user_texts[min(fallback_turn - 1, len(user_texts) - 1)] if user_texts else ""
+        key_moments.append(
+            KeyMoment(
+                turn=fallback_turn,
+                label="deviation_point",
+                user_text=fallback_text,
+                commentary="(Evaluator produced fewer than 3 key moments; this entry was added as a fallback.)",
+            )
+        )
+
+    return Score(
+        legal_soundness=legal_soundness,
+        strategic_effectiveness=strategic_effectiveness,
+        creativity=creativity,
+        key_moments=key_moments,
+    )
+
+
 # ── Evaluator Role ────────────────────────────────────────────────────────────
 
 
@@ -187,100 +297,4 @@ class EvaluatorRole:
         )
 
         raw = response.message.content.strip()
-        return self._parse_score(raw, turns)
-
-    def _parse_score(self, raw: str, turns: list[Turn]) -> Score:
-        """
-        Parse the LLM JSON response into a Score dataclass.
-        Handles JSON parse errors gracefully by returning a fallback Score.
-        """
-        cleaned = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
-        cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
-        cleaned = cleaned.strip()
-
-        user_texts: list[str] = [t.text for t in turns if t.role == "user"]
-
-        try:
-            data = json.loads(cleaned)
-        except json.JSONDecodeError as exc:
-            return Score(
-                legal_soundness=50,
-                strategic_effectiveness=50,
-                creativity=50,
-                key_moments=[
-                    KeyMoment(
-                        turn=1,
-                        label="deviation_point",
-                        user_text="(parse error — see evaluator logs)",
-                        commentary=(
-                            f"The evaluator could not parse its own response. "
-                            f"Raw output starts with: {raw[:120]!r}. "
-                            f"JSONDecodeError: {exc}"
-                        ),
-                    ),
-                    KeyMoment(
-                        turn=1,
-                        label="best_move",
-                        user_text="(parse error fallback)",
-                        commentary="Evaluator parse error; scores are neutral defaults.",
-                    ),
-                    KeyMoment(
-                        turn=1,
-                        label="worst_move",
-                        user_text="(parse error fallback)",
-                        commentary="Evaluator parse error; scores are neutral defaults.",
-                    ),
-                ],
-            )
-
-        def _safe_score(val, default: int = 50) -> int:
-            return max(0, min(100, int(val if val is not None else default)))
-
-        legal_soundness = _safe_score(data.get("legal_soundness"))
-        strategic_effectiveness = _safe_score(data.get("strategic_effectiveness"))
-        creativity = _safe_score(data.get("creativity"))
-
-        key_moments: list[KeyMoment] = []
-        for km in data.get("key_moments", []):
-            raw_turn = km.get("turn_number", 1)
-            turn_number = int(raw_turn if raw_turn is not None else 1)
-            label = km.get("label", "deviation_point")
-            user_text = km.get("user_text", "")
-            commentary = km.get("commentary", "")
-
-            if not user_text and 1 <= turn_number <= len(user_texts):
-                user_text = user_texts[turn_number - 1]
-
-            turn_number = max(1, min(turn_number, max(len(user_texts), 1)))
-
-            if label not in ("best_move", "worst_move", "deviation_point"):
-                label = "deviation_point"
-
-            key_moments.append(
-                KeyMoment(
-                    turn=turn_number,
-                    label=label,
-                    user_text=user_text,
-                    commentary=commentary,
-                )
-            )
-
-        key_moments = key_moments[:5]
-        while len(key_moments) < 3:
-            fallback_turn = len(key_moments) + 1
-            fallback_text = user_texts[min(fallback_turn - 1, len(user_texts) - 1)] if user_texts else ""
-            key_moments.append(
-                KeyMoment(
-                    turn=fallback_turn,
-                    label="deviation_point",
-                    user_text=fallback_text,
-                    commentary="(Evaluator produced fewer than 3 key moments; this entry was added as a fallback.)",
-                )
-            )
-
-        return Score(
-            legal_soundness=legal_soundness,
-            strategic_effectiveness=strategic_effectiveness,
-            creativity=creativity,
-            key_moments=key_moments,
-        )
+        return parse_score(raw, turns)
