@@ -15,6 +15,7 @@ from session_engine import (
     MockOpposingRole,
     Score,
     SessionEngine,
+    SessionStatus,
     State,
 )
 
@@ -59,14 +60,12 @@ def run_session(moves: list[str], mock_probes: list[str], mock_close: str) -> Sc
     session_id = engine.create_session("brown")
 
     for move in moves:
-        s = engine._sessions[session_id]
-        if s.state != State.IN_SESSION:
+        if engine.session_status(session_id).state != State.IN_SESSION.name:
             break
         engine.submit_move(session_id, move)
 
-    s = engine._sessions[session_id]
-    if s.state == State.IN_SESSION:
-        s.state = State.SESSION_END
+    if engine.session_status(session_id).state == State.IN_SESSION.name:
+        engine._force_state(session_id, State.SESSION_END)
 
     return engine.evaluate(session_id)
 
@@ -321,7 +320,7 @@ def test_evaluate_on_in_session_raises(mock_probes, mock_close):
 def test_submit_move_after_session_end_raises(mock_probes, mock_close):
     engine = make_engine(mock_probes, mock_close)
     session_id = engine.create_session("brown")
-    engine._sessions[session_id].state = State.SESSION_END
+    engine._force_state(session_id, State.SESSION_END)
     with pytest.raises(InvalidStateError, match="SESSION_END"):
         engine.submit_move(session_id, "a move")
 
@@ -329,9 +328,9 @@ def test_submit_move_after_session_end_raises(mock_probes, mock_close):
 def test_review_before_scored_raises(mock_probes, mock_close):
     engine = make_engine(mock_probes, mock_close)
     session_id = engine.create_session("brown")
-    engine._sessions[session_id].state = State.SESSION_END
+    engine._force_state(session_id, State.SESSION_END)
     engine.evaluate(session_id)
-    engine._sessions[session_id].state = State.IN_SESSION
+    engine._force_state(session_id, State.IN_SESSION)
     with pytest.raises(InvalidStateError, match="IN_SESSION"):
         engine.review(session_id, 0)
 
@@ -342,14 +341,13 @@ def test_review_requires_scored_or_review_state(mock_probes, mock_close):
     engine.submit_move(session_id, "the constitution does not permit racial classification")
     engine.submit_move(session_id, "plessy was wrongly decided")
     engine.submit_move(session_id, "the framers intended to end racial caste")
-    s = engine._sessions[session_id]
-    if s.state == State.IN_SESSION:
-        s.state = State.SESSION_END
+    if engine.session_status(session_id).state == State.IN_SESSION.name:
+        engine._force_state(session_id, State.SESSION_END)
     score = engine.evaluate(session_id)
     assert len(score.key_moments) > 0
     moment = engine.review(session_id, 0)
     assert moment is not None
-    assert engine._sessions[session_id].state == State.REVIEW
+    assert engine.session_status(session_id).state == State.REVIEW.name
     moment2 = engine.review(session_id, 0)
     assert moment2 is not None
 
@@ -370,9 +368,9 @@ def test_create_session_returns_string(mock_probes, mock_close):
 def test_session_transitions_to_scored_after_evaluate(mock_probes, mock_close):
     engine = make_engine(mock_probes, mock_close)
     session_id = engine.create_session("brown")
-    engine._sessions[session_id].state = State.SESSION_END
+    engine._force_state(session_id, State.SESSION_END)
     engine.evaluate(session_id)
-    assert engine._sessions[session_id].state == State.SCORED
+    assert engine.session_status(session_id).state == State.SCORED.name
 
 
 def test_full_session_flow_no_api_calls(mock_probes, mock_close):
@@ -386,14 +384,12 @@ def test_full_session_flow_no_api_calls(mock_probes, mock_close):
         "the framers intended to end racial caste",
     ]
     for move in moves:
-        s = engine._sessions[session_id]
-        if s.state != State.IN_SESSION:
+        if engine.session_status(session_id).state != State.IN_SESSION.name:
             break
         engine.submit_move(session_id, move)
 
-    s = engine._sessions[session_id]
-    if s.state == State.IN_SESSION:
-        s.state = State.SESSION_END
+    if engine.session_status(session_id).state == State.IN_SESSION.name:
+        engine._force_state(session_id, State.SESSION_END)
 
     score = engine.evaluate(session_id)
     assert isinstance(score, Score)
@@ -430,7 +426,7 @@ def test_review_empty_key_moments_raises(mock_probes, mock_close):
     """review() with no key moments raises IndexError with a clear message."""
     engine = make_engine(mock_probes, mock_close)
     session_id = engine.create_session("brown")
-    engine._sessions[session_id].state = State.SESSION_END
+    engine._force_state(session_id, State.SESSION_END)
 
     score = engine.evaluate(session_id)
     score.key_moments.clear()
@@ -451,12 +447,12 @@ def test_evaluate_rollback_on_exception(mock_probes, mock_close):
 
     engine = SessionEngine(opposing_role_factory=factory, evaluator=BrokenEvaluator())
     session_id = engine.create_session("brown")
-    engine._sessions[session_id].state = State.SESSION_END
+    engine._force_state(session_id, State.SESSION_END)
 
     with pytest.raises(RuntimeError, match="evaluator exploded"):
         engine.evaluate(session_id)
 
-    assert engine._sessions[session_id].state == State.SESSION_END
+    assert engine.session_status(session_id).state == State.SESSION_END.name
 
 
 def test_each_session_gets_fresh_opposing_role(mock_probes, mock_close):
@@ -465,6 +461,6 @@ def test_each_session_gets_fresh_opposing_role(mock_probes, mock_close):
     sid1 = engine.create_session("brown")
     sid2 = engine.create_session("brown")
 
-    role1 = engine._sessions[sid1].opposing_role
-    role2 = engine._sessions[sid2].opposing_role
+    role1 = engine.get_opposing_role(sid1)
+    role2 = engine.get_opposing_role(sid2)
     assert role1 is not role2

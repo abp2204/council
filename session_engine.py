@@ -45,7 +45,17 @@ __all__ = [
     "MockOpposingRole",
     "MockEvaluator",
     "SessionEngine",
+    "SessionStatus",
 ]
+
+
+# ── Public status snapshot ────────────────────────────────────────────────────
+
+@dataclass
+class SessionStatus:
+    state: str          # string name of the State enum value
+    turn_count: int
+    deviation_count: int
 
 
 # ── State Machine ─────────────────────────────────────────────────────────────
@@ -347,7 +357,20 @@ class SessionEngine:
     def get_turns(self, session_id: str) -> list[Turn]:
         return self._get_session(session_id).turns
 
+    def session_status(self, session_id: str) -> SessionStatus:
+        """Return a public snapshot of the session's observable state."""
+        s = self._get_session(session_id)
+        return SessionStatus(
+            state=s.state.name,
+            turn_count=sum(1 for t in s.turns if t.role == "user"),
+            deviation_count=s.deviation_count,
+        )
+
     # ── Internal ──────────────────────────────────────────────────────────────
+
+    def _force_state(self, session_id: str, state: State) -> None:
+        """Test helper: forcibly set the state of a session."""
+        self._get_session(session_id).state = state
 
     def _get_session(self, session_id: str) -> _SessionState:
         s = self._sessions.get(session_id)
