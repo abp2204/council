@@ -239,12 +239,10 @@ def test_evaluate_with_case_context():
 # ── Non-API Tests (always run) ────────────────────────────────────────────────
 
 class TestParseScore:
-    """Tests for _parse_score that don't require an API key."""
+    """Tests for parse_score that don't require an API key."""
 
     def test_parse_score_clamps_out_of_range(self):
-        from evaluator import EvaluatorRole
-
-        evaluator = EvaluatorRole.__new__(EvaluatorRole)
+        from evaluator import parse_score
 
         transcript = [
             Turn(role="user", text="My argument about equal protection."),
@@ -263,7 +261,7 @@ class TestParseScore:
             ]
         }"""
 
-        score = evaluator._parse_score(raw_json, transcript)
+        score = parse_score(raw_json, transcript)
 
         assert score.legal_soundness == 100
         assert score.strategic_effectiveness == 0
