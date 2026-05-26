@@ -3,20 +3,19 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from dependencies import engine_dep
+from fastapi import APIRouter, Depends, HTTPException
+from session_engine import SessionEngine
 from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(tags=["stream"])
 
 
-def _get_engine():
-    from dependencies import get_engine
-    return get_engine()
-
-
 @router.get("/sessions/{session_id}/stream")
-async def stream_response(session_id: str):
-    engine = _get_engine()
+async def stream_response(
+    session_id: str,
+    engine: SessionEngine = Depends(engine_dep),
+):
     try:
         opposing_role = engine.get_opposing_role(session_id)
         turns = engine.get_turns(session_id)

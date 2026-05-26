@@ -58,6 +58,19 @@ app.add_middleware(
 )
 
 
+# ── Exception → HTTP status mapping ──────────────────────────────────────────
+#
+# This is the canonical, single place that defines how domain exceptions map to
+# HTTP status codes.  Routers raise these exceptions naturally; the handlers
+# below translate them.  When adding a new domain exception, register it here.
+#
+#   Exception          │ HTTP status │ Meaning
+#   ───────────────────┼─────────────┼──────────────────────────────────────────
+#   KeyError           │ 404         │ session or case ID not found
+#   IndexError         │ 404         │ numeric index (e.g. moment_index) out of range
+#   InvalidStateError  │ 409         │ operation not allowed in current session state
+#   DraftCaseError     │ 404         │ case exists but is not yet published
+#
 # ── Exception handlers ────────────────────────────────────────────────────────
 
 
