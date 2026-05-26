@@ -1,0 +1,332 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* ─── Tailwind v4 theme tokens ─── */
+@theme {
+  --color-charcoal:     #0e0c0a;
+  --color-walnut-deep:  #141210;
+  --color-walnut-warm:  #1e1410;
+  --color-walnut-mid:   #2a1c14;
+  --color-walnut-panel: #231a12;
+  --color-gold-glow:    #d4af37;
+  --color-gold-bright:  #f0c840;
+  --color-gold-dim:     #a08828;
+  --color-ivory:        #f0ebe0;
+  --color-ivory-dim:    #c8c0ae;
+}
+
+/* ─── Design tokens ─── */
+:root {
+  --charcoal:      #0e0c0a;
+  --walnut-deep:   #141210;
+  --walnut-warm:   #1e1410;
+  --walnut-mid:    #2a1c14;
+  --walnut-panel:  #231a12;
+  --gold-glow:     #d4af37;
+  --gold-bright:   #f0c840;
+  --gold-dim:      #a08828;
+  --gold-faint:    rgba(212, 175, 55, 0.10);
+  --gold-subtle:   rgba(212, 175, 55, 0.22);
+  --gold-medium:   rgba(212, 175, 55, 0.45);
+  --ivory:         #f0ebe0;
+  --ivory-dim:     #c8c0ae;
+  --parchment:     #e8dfc8;
+  --ember:         rgba(180, 80, 20, 0.15);
+  --green-verdict: #6ee7b7;
+  --red-verdict:   #fca5a5;
+}
+
+/* ─── Base ─── */
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--charcoal);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 119px,
+      rgba(212, 175, 55, 0.016) 119px,
+      rgba(212, 175, 55, 0.016) 120px
+    ),
+    radial-gradient(
+      ellipse 90% 55% at 50% 15%,
+      #281e10 0%,
+      #1e1510 30%,
+      #141210 60%,
+      #0e0c0a 100%
+    );
+  color: var(--ivory);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Grain/paper texture overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.028;
+  mix-blend-mode: overlay;
+}
+
+/* ─── Typography ─── */
+h1, h2, h3, h4, .legal-serif {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.06em;
+}
+
+.legal-body {
+  font-family: 'Playfair Display', serif;
+}
+
+.legal-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-glow);
+}
+
+/* ─── Selection ─── */
+::selection {
+  background: rgba(212, 175, 55, 0.28);
+  color: var(--ivory);
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, var(--gold-dim), var(--gold-glow));
+  border-radius: 2px;
+}
+
+/* ─── Border utilities ─── */
+.gold-border {
+  border: 1px solid var(--gold-subtle);
+}
+.gold-border-dim {
+  border: 1px solid rgba(212, 175, 55, 0.12);
+}
+
+/* ─── Shadow utilities ─── */
+.pillar-shadow {
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.65),
+    0 10px 36px rgba(0, 0, 0, 0.45),
+    inset 0 0 20px rgba(212, 175, 55, 0.035);
+}
+
+.pillar-shadow-deep {
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.75),
+    0 20px 72px rgba(0, 0, 0, 0.55),
+    inset 0 0 40px rgba(212, 175, 55, 0.05),
+    inset 0 1px 0 rgba(212, 175, 55, 0.12);
+}
+
+/* ─── Hover glow ─── */
+.gold-glow-hover {
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
+}
+.gold-glow-hover:hover {
+  box-shadow:
+    0 0 40px rgba(212, 175, 55, 0.11),
+    0 12px 48px rgba(0, 0, 0, 0.5),
+    inset 0 0 28px rgba(212, 175, 55, 0.05);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+/* ─── Gold rules ─── */
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--gold-dim) 20%,
+    var(--gold-glow) 50%,
+    var(--gold-dim) 80%,
+    transparent
+  );
+}
+
+.gold-rule-dim {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(212, 175, 55, 0.25) 30%,
+    rgba(212, 175, 55, 0.25) 70%,
+    transparent
+  );
+}
+
+/* ─── Message panels ─── */
+
+/* The Court / opponent — left gold border, dark interior */
+.court-panel {
+  background: linear-gradient(160deg, #1c140a 0%, #110d05 100%);
+  border: 1px solid rgba(212, 175, 55, 0.14);
+  border-left: 2px solid rgba(212, 175, 55, 0.52);
+  box-shadow:
+    inset 0 0 32px rgba(212, 175, 55, 0.025),
+    4px 0 0 rgba(212, 175, 55, 0.02);
+}
+
+/* User / self — right gold border, warm walnut */
+.user-panel {
+  background: linear-gradient(160deg, #2c1e14 0%, #1e1410 100%);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  border-right: 2px solid rgba(212, 175, 55, 0.28);
+}
+
+/* ─── Score bars ─── */
+.score-bar-track {
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  height: 3px;
+}
+
+.score-bar-fill {
+  height: 100%;
+  background: linear-gradient(to right, var(--gold-dim), var(--gold-glow), var(--gold-bright));
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.45);
+}
+
+/* ─── Waveform ─── */
+.waveform-bar {
+  width: 2.5px;
+  border-radius: 1px;
+  background: var(--gold-glow);
+  box-shadow: 0 0 5px rgba(212, 175, 55, 0.7);
+  animation: waveBar 0.85s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+@keyframes waveBar {
+  0%, 100% { transform: scaleY(0.15); }
+  50%       { transform: scaleY(1); }
+}
+
+/* ─── Pulses ─── */
+@keyframes amberPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(212, 175, 55, 0.25); }
+  50%       { box-shadow: 0 0 22px rgba(212, 175, 55, 0.75), 0 0 48px rgba(212, 175, 55, 0.2); }
+}
+.amber-pulse { animation: amberPulse 1.4s ease-in-out infinite; }
+
+/* ─── Streaming cursor ─── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.streaming-cursor {
+  display: inline-block;
+  width: 1.5px;
+  height: 0.85em;
+  background: var(--gold-glow);
+  border-radius: 1px;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 0.85s ease infinite;
+}
+
+/* ─── Gavel ring ─── */
+.gavel-ring {
+  border: 1.5px solid var(--gold-glow);
+  box-shadow:
+    0 0 28px rgba(212, 175, 55, 0.18),
+    inset 0 0 28px rgba(212, 175, 55, 0.06);
+}
+
+/* ─── Pillar columns ─── */
+.pillar-left,
+.pillar-right {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(212, 175, 55, 0.08) 8%,
+    rgba(212, 175, 55, 0.16) 50%,
+    rgba(212, 175, 55, 0.08) 92%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+.pillar-left  { left: 32px; }
+.pillar-right { right: 32px; }
+
+.pillar-left::before,
+.pillar-right::before {
+  content: '';
+  position: absolute;
+  top: 7%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.25);
+}
+
+.pillar-left::after,
+.pillar-right::after {
+  content: '';
+  position: absolute;
+  bottom: 7%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.25);
+}
+
+/* ─── Case card left accent ─── */
+.case-card-accent {
+  position: absolute;
+  left: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, var(--gold-glow), transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.group:hover .case-card-accent { opacity: 1; }
+
+/* ─── Arch accent on cards ─── */
+.arch-top-accent::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(212,175,55,0.5), transparent);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.group:hover .arch-top-accent::after { opacity: 1; }
+
+/* ─── Key moment accordion ─── */
+@keyframes accordionOpen {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.accordion-content {
+  animation: accordionOpen 0.25s ease forwards;
+}

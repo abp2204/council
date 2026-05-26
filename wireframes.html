@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>COUNCIL — wireframe exploration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@400;700&family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: 'Inter', system-ui, sans-serif; color: #2a251f; }
+  #root { min-height: 100vh; }
+
+  /* ---- Sketch primitives ---- */
+  :root {
+    --ink: #1a1612;
+    --ink-2: #5a4a3a;
+    --ink-3: #8a7a68;
+    --paper: #faf7f0;
+    --paper-2: #f3ede1;
+    --accent: #b8862a;     /* dimmer amber so b&w reads first */
+    --accent-soft: #f5e7c2;
+    --rule: #1a1612;
+    --stroke-w: 1.5px;
+    --hand: 'Caveat', cursive;
+    --hand-2: 'Kalam', cursive;
+    --serif: 'Cinzel', serif;
+    --ui: 'Inter', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  .sk {
+    border: var(--stroke-w) solid var(--ink);
+    background: var(--paper);
+    box-sizing: border-box;
+  }
+  .sk-dash { border-style: dashed; }
+  .sk-soft { border-color: var(--ink-2); }
+  .sk-fill { background: var(--paper-2); }
+  .sk-amber { color: var(--accent); }
+  .sk-amber-bg { background: var(--accent-soft); border-color: var(--accent); }
+
+  .hand   { font-family: var(--hand);  font-weight: 600; }
+  .hand-2 { font-family: var(--hand-2); }
+  .serif  { font-family: var(--serif); letter-spacing: 0.05em; }
+  .ui     { font-family: var(--ui); }
+  .mono   { font-family: var(--mono); }
+
+  .scribble {
+    display: inline-block;
+    height: 0.55em;
+    background: repeating-linear-gradient(95deg, var(--ink-2) 0 6px, transparent 6px 9px);
+    border-radius: 2px;
+    vertical-align: middle;
+    opacity: 0.55;
+  }
+  .scribble-line {
+    height: 1px;
+    background: repeating-linear-gradient(90deg, var(--ink-2) 0 6px, transparent 6px 9px);
+    margin: 6px 0;
+  }
+  .scribble-block {
+    border-radius: 4px;
+    background:
+      repeating-linear-gradient(8deg, transparent 0 5px, rgba(26,22,18,0.07) 5px 6px),
+      var(--paper-2);
+  }
+
+  /* annotation callouts */
+  .anno {
+    position: absolute;
+    font-family: var(--hand);
+    font-size: 18px;
+    color: var(--accent);
+    line-height: 1.1;
+    pointer-events: none;
+    z-index: 5;
+    max-width: 180px;
+  }
+  .anno svg { position: absolute; overflow: visible; }
+  .anno b { font-weight: 700; }
+  .anno em { font-style: normal; text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--accent); }
+
+  body.no-anno .anno { display: none; }
+
+  /* tiny "icon" placeholders -- never draw real icons */
+  .ph-icon {
+    width: 18px; height: 18px; border: var(--stroke-w) solid var(--ink); border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--hand); font-size: 13px; line-height: 1; color: var(--ink);
+    background: var(--paper);
+  }
+  .ph-circle { border-radius: 50%; }
+  .ph-img {
+    background:
+      repeating-linear-gradient(135deg, transparent 0 11px, rgba(26,22,18,0.06) 11px 12px),
+      var(--paper);
+    border: var(--stroke-w) dashed var(--ink-2);
+    color: var(--ink-3);
+    font-family: var(--mono);
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+  }
+
+  /* arch shape for gothic accents */
+  .arch-top {
+    border-radius: 50% 50% 0 0 / 18% 18% 0 0;
+  }
+
+  /* sketchy gavel-strike pulse for one of the score reveals */
+  @keyframes pulse-amber { 0%,100% { opacity: 0.6 } 50% { opacity: 1 } }
+  .pulse { animation: pulse-amber 1.8s ease-in-out infinite; }
+
+  /* hide native scrollbars inside artboards */
+  .sk-scroll { overflow: hidden; }
+
+  /* ensure wireframe text inside artboards doesn't inherit weird kerning */
+  .wf * { -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="application/json" id="design-canvas-default-zoom">{ "zoom": 0.55 }</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="wf-primitives.jsx"></script>
+<script type="text/babel" src="wf-lobby.jsx"></script>
+<script type="text/babel" src="wf-session.jsx"></script>
+<script type="text/babel" src="wf-review.jsx"></script>
+<script type="text/babel" src="wf-docs.jsx"></script>
+<script type="text/babel" src="wf-voice.jsx"></script>
+<script type="text/babel" src="wf-app.jsx"></script>
+</body>
+</html>
