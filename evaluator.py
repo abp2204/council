@@ -238,7 +238,7 @@ class EvaluatorRole:
     transcript cold and returns a Score dataclass.
     """
 
-    MODEL = "qwen2.5:14b"
+    MODEL = "gemma4"
 
     def __init__(self) -> None:
         pass

@@ -51,50 +51,57 @@ function ScoreRing({
   color: string;
   delay?: number;
 }) {
-  const r = 62;
-  const cx = 74;
-  const cy = 74;
+  const r = 90;
+  const cx = 100;
+  const cy = 100;
   const circumference = 2 * Math.PI * r;
   const targetOffset = circumference * (1 - value / 100);
 
   return (
     <svg
-      width="148"
-      height="148"
-      viewBox="0 0 148 148"
+      width="200"
+      height="200"
+      viewBox="0 0 200 200"
       style={{ overflow: "visible" }}
     >
       {/* Outer decorative ring */}
       <circle
-        cx={cx} cy={cy} r={r + 10}
+        cx={cx} cy={cy} r={r + 12}
         fill="none"
         stroke="rgba(212,175,55,0.05)"
         strokeWidth="1"
+      />
+      {/* Secondary outer ring */}
+      <circle
+        cx={cx} cy={cy} r={r + 6}
+        fill="none"
+        stroke="rgba(212,175,55,0.03)"
+        strokeWidth="0.5"
       />
       {/* Track */}
       <circle
         cx={cx} cy={cy} r={r}
         fill="none"
         stroke="rgba(255,255,255,0.04)"
-        strokeWidth="4"
+        strokeWidth="5"
       />
       {/* Animated fill */}
       <motion.circle
         cx={cx} cy={cy} r={r}
         fill="none"
         stroke={color}
-        strokeWidth="4"
+        strokeWidth="5"
         strokeLinecap="butt"
         strokeDasharray={circumference}
         initial={{ strokeDashoffset: circumference }}
         animate={{ strokeDashoffset: targetOffset }}
-        transition={{ delay, duration: 1.3, ease: EASE }}
+        transition={{ delay, duration: 1.5, ease: EASE }}
         transform={`rotate(-90 ${cx} ${cy})`}
-        style={{ filter: `drop-shadow(0 0 8px ${color}55)` }}
+        style={{ filter: `drop-shadow(0 0 10px ${color}55)` }}
       />
       {/* Inner glow */}
       <circle
-        cx={cx} cy={cy} r={r - 12}
+        cx={cx} cy={cy} r={r - 15}
         fill="rgba(212,175,55,0.02)"
       />
     </svg>
@@ -165,15 +172,18 @@ export default function Review() {
   const { id: sessionId } = useParams<{ id: string }>();
   const [score, setScore]     = useState<Score | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [caseTitle, setCaseTitle] = useState<string | null>(null);
 
   useEffect(() => {
     const cached = sessionStorage.getItem(`council_score_${sessionId}`);
     if (cached) setScore(JSON.parse(cached));
+    const title = sessionStorage.getItem(`council_case_title_${sessionId}`);
+    if (title) setCaseTitle(title);
   }, [sessionId]);
 
   if (!score) {
     return (
-      <main className="max-w-2xl mx-auto px-6 py-28 text-center">
+      <main className="max-w-3xl mx-auto px-6 py-28 text-center">
         <div
           style={{
             fontFamily: "'Cinzel', serif",
@@ -199,21 +209,26 @@ export default function Review() {
     : "#fca5a5";
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-12 pb-28">
+    <main className="max-w-3xl mx-auto px-6 py-12 pb-28">
 
       {/* ── Nav ── */}
       <div className="flex items-center justify-between mb-14">
-        <span
-          style={{
-            fontFamily: "'Cinzel', serif",
-            fontSize: "0.6rem",
-            letterSpacing: "0.22em",
-            textTransform: "uppercase",
-            color: "var(--gold-glow)",
-          }}
-        >
-          Session Review
-        </span>
+        <div className="flex flex-col gap-1.5">
+          <span
+            style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: "0.6rem",
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "var(--gold-glow)",
+            }}
+          >
+            Session Review
+          </span>
+          {caseTitle && (
+            <span className="session-case-title">{caseTitle}</span>
+          )}
+        </div>
         <a
           href="/"
           style={{
@@ -240,16 +255,16 @@ export default function Review() {
         className="text-center mb-14"
       >
         {/* Arch ornament */}
-        <svg width="120" height="56" viewBox="0 0 120 56" fill="none" className="mx-auto mb-4" aria-hidden>
+        <svg width="280" height="130" viewBox="0 0 120 56" fill="none" className="mx-auto mb-6" aria-hidden>
           <path
             d="M8 56 C8 22, 44 4, 60 4 C76 4, 112 22, 112 56"
-            stroke="rgba(212,175,55,0.3)" strokeWidth="1.5" fill="none"
+            stroke="rgba(212,175,55,0.38)" strokeWidth="1.5" fill="none"
           />
           <path
             d="M22 56 C22 30, 46 14, 60 14 C74 14, 98 30, 98 56"
-            stroke="rgba(212,175,55,0.16)" strokeWidth="1" fill="none"
+            stroke="rgba(212,175,55,0.20)" strokeWidth="1" fill="none"
           />
-          <polygon points="60,0 63,7 60,14 57,7" fill="rgba(212,175,55,0.7)" />
+          <polygon points="60,0 63,7 60,14 57,7" fill="rgba(212,175,55,0.82)" />
         </svg>
 
         <p
@@ -276,11 +291,11 @@ export default function Review() {
               transition={{ delay: 0.6, duration: 0.5, ease: EASE }}
               style={{
                 fontFamily: "'Cinzel', serif",
-                fontSize: "2.75rem",
+                fontSize: "3.5rem",
                 fontWeight: 600,
                 lineHeight: 1,
                 color: overallColor,
-                textShadow: `0 0 30px ${overallColor}40`,
+                textShadow: `0 0 40px ${overallColor}40`,
               }}
             >
               {overall}
@@ -487,6 +502,65 @@ export default function Review() {
           </div>
         </motion.section>
       )}
+
+      {/* ── Call to action ── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.75, duration: 0.55, ease: EASE }}
+        className="flex items-center justify-center gap-6 mt-10"
+      >
+        <a
+          href="/"
+          style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: "0.62rem",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            padding: "12px 32px",
+            border: "1px solid var(--gold-glow)",
+            color: "var(--charcoal)",
+            background: "var(--gold-glow)",
+            textDecoration: "none",
+            transition: "background 0.2s",
+            display: "inline-block",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.background = "var(--gold-bright)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.background = "var(--gold-glow)";
+          }}
+        >
+          Argue Again →
+        </a>
+        <a
+          href="/"
+          style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: "0.62rem",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            padding: "12px 32px",
+            border: "1px solid rgba(212,175,55,0.38)",
+            color: "var(--gold-glow)",
+            background: "rgba(212,175,55,0.04)",
+            textDecoration: "none",
+            transition: "background 0.2s, border-color 0.2s",
+            display: "inline-block",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.background = "rgba(212,175,55,0.10)";
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(212,175,55,0.60)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.background = "rgba(212,175,55,0.04)";
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(212,175,55,0.38)";
+          }}
+        >
+          Browse Cases
+        </a>
+      </motion.div>
     </main>
   );
 }

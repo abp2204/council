@@ -1,7 +1,7 @@
 """
 COUNCIL — Evaluator Tests (Issue #19)
 
-Integration tests for EvaluatorRole using local Ollama (qwen2.5:14b).
+Integration tests for EvaluatorRole using local Ollama (gemma4).
 Live tests are skipped when Ollama is not reachable.
 
 Non-API tests (parse logic) always run.

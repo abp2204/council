@@ -4,7 +4,7 @@ COUNCIL — Transcript Ingestion Pipeline
 Converts a raw SCOTUS oral argument transcript into a Case-ready dict
 containing a Historical Record (the arguing lawyer's verbatim turns) and
 a Profile (a behavioral fingerprint of the opposing role), using pure regex
-parsing for the record and local Ollama (qwen2.5:14b) for the profile.
+parsing for the record and local Ollama (gemma4) for the profile.
 
 Usage (library):
     result = ingest_transcript(raw_text, "MR. MARSHALL", "JUSTICE FRANKFURTER")
@@ -14,7 +14,7 @@ Usage (CLI):
     python -m transcript_ingestion <transcript.txt> --lawyer "MR. MARSHALL" --opponent "JUSTICE FRANKFURTER"
 
 Environment:
-    Ollama must be running locally (ollama serve) with qwen2.5:14b pulled.
+    Ollama must be running locally (ollama serve) with gemma4 pulled.
 """
 
 import os
@@ -153,7 +153,7 @@ def extract_profile(
     )
 
     message = ollama.chat(
-        model="qwen2.5:14b",
+        model="gemma4",
         messages=[
             {"role": "system", "content": _PROFILE_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -240,7 +240,7 @@ def synthesize_system_prompt(profile: dict) -> str:
     """
     Generate a system prompt from a behavioural Profile dict.
 
-    Calls local Ollama (qwen2.5:14b),
+    Calls local Ollama (gemma4),
     passing the profile as JSON in the user message.
 
     Raises:
@@ -254,7 +254,7 @@ def synthesize_system_prompt(profile: dict) -> str:
     )
 
     message = ollama.chat(
-        model="qwen2.5:14b",
+        model="gemma4",
         messages=[
             {"role": "system", "content": _SYNTHESIS_SYSTEM},
             {"role": "user", "content": user_content},
@@ -315,7 +315,7 @@ def ingest_transcript(
     Notes
     -----
     - Historical Record extraction is pure parsing; no API key required.
-    - Profile extraction calls local Ollama (qwen2.5:14b); requires Ollama running.
+    - Profile extraction calls local Ollama (gemma4); requires Ollama running.
     """
     historical_record = extract_historical_record(raw_text, lawyer_name)
     if not historical_record:

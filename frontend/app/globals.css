@@ -330,3 +330,133 @@ h1, h2, h3, h4, .legal-serif {
 .accordion-content {
   animation: accordionOpen 0.25s ease forwards;
 }
+
+/* ─── Corner notch clip-path ─── */
+.corner-notch {
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
+}
+
+/* ─── Case grid — 2-col on md+ ─── */
+@media (min-width: 720px) {
+  .case-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+}
+
+/* ─── Case index watermark ─── */
+.case-index-num {
+  font-family: 'Cinzel', serif;
+  font-size: 4.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(212, 175, 55, 0.055);
+  pointer-events: none;
+  user-select: none;
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  letter-spacing: -0.03em;
+}
+
+/* ─── Deviation band ─── */
+.deviation-band {
+  width: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(245, 158, 11, 0.07) 15%,
+    rgba(245, 158, 11, 0.11) 50%,
+    rgba(245, 158, 11, 0.07) 85%,
+    transparent
+  );
+  border-top: 1px solid rgba(245, 158, 11, 0.20);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.20);
+  padding: 7px 20px;
+}
+
+/* ─── Deviation inline badge ─── */
+.deviation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.30);
+  padding: 2px 8px 1px;
+  background: rgba(245, 158, 11, 0.07);
+}
+
+/* ─── Session case title (in header) ─── */
+.session-case-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ivory-dim);
+  font-weight: 500;
+}
+
+/* ─── Turn argument label ─── */
+.argument-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.54rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(212, 175, 55, 0.38);
+}
+
+/* ─── Scale icon closed-session ring ─── */
+@keyframes scaleGlow {
+  0%, 100% {
+    box-shadow: 0 0 24px rgba(212, 175, 55, 0.15), inset 0 0 20px rgba(212, 175, 55, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 52px rgba(212, 175, 55, 0.32), 0 0 90px rgba(212, 175, 55, 0.09),
+                inset 0 0 44px rgba(212, 175, 55, 0.11);
+  }
+}
+.scale-ring {
+  border: 1.5px solid var(--gold-glow);
+  animation: scaleGlow 2.5s ease-in-out infinite;
+}
+
+/* ─── Mic recording state ─── */
+.mic-active {
+  border: 1px solid var(--gold-glow) !important;
+  background: rgba(212, 175, 55, 0.06) !important;
+  animation: amberPulse 1.4s ease-in-out infinite;
+}
+
+/* ─── Enter chamber CTA button ─── */
+.chamber-enter-btn {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 10px 22px;
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  color: var(--gold-glow);
+  background: rgba(212, 175, 55, 0.04);
+  transition: background 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chamber-enter-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.10);
+  border-color: rgba(212, 175, 55, 0.60);
+}
+.chamber-enter-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

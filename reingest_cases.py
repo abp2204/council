@@ -3,7 +3,7 @@ COUNCIL — Re-ingest existing cases with synthesized system prompts.
 
 Run this script to replace the hand-authored system prompts in brown.json
 and gideon.json with LLM-synthesized ones derived from each case's existing
-Profile data. Uses local Ollama (qwen2.5:14b) — no API key required.
+Profile data. Uses local Ollama (gemma4) — no API key required.
 
 Usage:
     python3 reingest_cases.py

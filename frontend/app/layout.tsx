@@ -20,8 +20,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
           aria-hidden
           style={{
-            height: "2px",
-            background: "linear-gradient(to right, transparent 0%, rgba(212,175,55,0.12) 12%, rgba(212,175,55,0.48) 50%, rgba(212,175,55,0.12) 88%, transparent 100%)",
+            height: "3px",
+            background: "linear-gradient(to right, transparent 0%, rgba(212,175,55,0.16) 10%, rgba(212,175,55,0.62) 50%, rgba(212,175,55,0.16) 90%, transparent 100%)",
           }}
         />
 
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div
           className="fixed top-0 left-1/2 -translate-x-1/2 pointer-events-none z-0 select-none"
           aria-hidden
-          style={{ opacity: 0.035 }}
+          style={{ opacity: 0.05 }}
         >
           <svg width="700" height="360" viewBox="0 0 700 360" fill="none">
             <path

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { Scale } from "lucide-react";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -62,6 +63,8 @@ export default function Session() {
   const [evaluating, setEvaluating]   = useState(false);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [micError, setMicError]       = useState<string | null>(null);
+  const [caseTitle, setCaseTitle]       = useState<string | null>(null);
+  const [opponentRole, setOpponentRole] = useState<string>("The Court");
 
   const bottomRef        = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -69,10 +72,12 @@ export default function Session() {
 
   useEffect(() => {
     const opening = sessionStorage.getItem(`council_opening_${sessionId}`);
+    const title   = sessionStorage.getItem(`council_case_title_${sessionId}`);
     if (opening) {
       setTurns([{ role: "opponent", text: opening }]);
       sessionStorage.removeItem(`council_opening_${sessionId}`);
     }
+    if (title) setCaseTitle(title);
   }, [sessionId]);
 
   useEffect(() => {
@@ -82,7 +87,7 @@ export default function Session() {
   const handleMoveResponse = useCallback(
     (data: { deviation?: boolean; stream_url: string; transcription?: string }) => {
       if (data.transcription) setInput(data.transcription);
-      setTurns((prev) => [...prev, { role: "opponent", text: "", streaming: true }]);
+      setTurns((prev) => [...prev, { role: "opponent", text: "", streaming: true, deviation: data.deviation ?? false }]);
 
       const streamUrl = data.stream_url.replace(/^\//, "/api/");
       let accumulated = "";
@@ -232,14 +237,21 @@ export default function Session() {
 
   const argCount = turns.filter((t) => t.role === "user").length;
 
+  const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+  let userTurnCount = 0;
+  const turnsWithNums = turns.map((t) => ({
+    ...t,
+    userNum: t.role === "user" ? ++userTurnCount : 0,
+  }));
+
   return (
-    <main className="flex flex-col h-screen max-w-3xl mx-auto px-5 relative">
+    <main className="flex flex-col h-screen max-w-4xl mx-auto px-5 relative">
 
       {/* ── Header ── */}
       <header className="shrink-0 pt-6 pb-0">
         <div className="flex items-center justify-between">
           {/* Brand + breadcrumb */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 overflow-hidden">
             <span
               style={{
                 fontFamily: "'Cinzel', serif",
@@ -247,11 +259,12 @@ export default function Session() {
                 letterSpacing: "0.22em",
                 textTransform: "uppercase",
                 color: "var(--gold-glow)",
+                flexShrink: 0,
               }}
             >
               Council
             </span>
-            <span style={{ color: "rgba(212,175,55,0.22)", fontSize: "7px" }}>◆</span>
+            <span style={{ color: "rgba(212,175,55,0.22)", fontSize: "7px", flexShrink: 0 }}>◆</span>
             <span
               style={{
                 fontFamily: "'Cinzel', serif",
@@ -259,10 +272,17 @@ export default function Session() {
                 letterSpacing: "0.18em",
                 textTransform: "uppercase",
                 color: "rgba(212,175,55,0.42)",
+                flexShrink: 0,
               }}
             >
               The Arena
             </span>
+            {caseTitle && (
+              <>
+                <span style={{ color: "rgba(212,175,55,0.18)", fontSize: "7px", flexShrink: 0 }}>◆</span>
+                <span className="session-case-title truncate">{caseTitle}</span>
+              </>
+            )}
           </div>
 
           {/* Right: arg counter + back */}
@@ -327,7 +347,7 @@ export default function Session() {
         )}
 
         <AnimatePresence initial={false}>
-          {turns.map((turn, i) => (
+          {turnsWithNums.map((turn, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 10 }}
@@ -349,7 +369,7 @@ export default function Session() {
                         color: "var(--gold-glow)",
                       }}
                     >
-                      The Court
+                      {opponentRole}
                     </span>
                     {turn.streaming && (
                       <span
@@ -364,20 +384,24 @@ export default function Session() {
                         · deliberating
                       </span>
                     )}
-                    {turn.deviation && (
+                  </div>
+
+                  {/* Deviation alert */}
+                  {turn.deviation && (
+                    <div className="deviation-band flex items-center gap-3 mb-3">
+                      <span className="deviation-badge">⚑ Deviation</span>
                       <span
                         style={{
-                          fontSize: "0.52rem",
-                          letterSpacing: "0.12em",
-                          textTransform: "uppercase",
-                          color: "#f59e0b",
                           fontFamily: "'Cinzel', serif",
+                          fontSize: "0.5rem",
+                          letterSpacing: "0.12em",
+                          color: "rgba(245, 158, 11, 0.55)",
                         }}
                       >
-                        · ⚑ deviation detected
+                        Argument departs from the historical record
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Panel */}
                   <div
@@ -399,16 +423,10 @@ export default function Session() {
                 <div style={{ maxWidth: "72%" }}>
                   {/* Label */}
                   <div className="flex items-center justify-end gap-2 mb-2 pr-4">
-                    <span
-                      style={{
-                        fontFamily: "'Cinzel', serif",
-                        fontSize: "0.56rem",
-                        letterSpacing: "0.24em",
-                        textTransform: "uppercase",
-                        color: "rgba(212,175,55,0.42)",
-                      }}
-                    >
-                      You
+                    <span className="argument-label">
+                      {turn.userNum && turn.userNum <= romanNumerals.length
+                        ? `Argument ${romanNumerals[turn.userNum - 1]}`
+                        : `Argument ${turn.userNum}`}
                     </span>
                   </div>
 
@@ -448,11 +466,11 @@ export default function Session() {
             className="text-center py-9"
           >
             <div
-              className="inline-flex items-center justify-center w-[60px] h-[60px] mb-5 gavel-ring text-[22px]"
+              className="inline-flex items-center justify-center w-[68px] h-[68px] mb-5 scale-ring"
               style={{ background: "rgba(212,175,55,0.025)" }}
               aria-hidden
             >
-              ⚖
+              <Scale size={24} color="var(--gold-glow)" />
             </div>
 
             <p
@@ -524,26 +542,23 @@ export default function Session() {
                 onClick={toggleRecording}
                 disabled={submitting && recordState === "idle"}
                 aria-label={recordState === "recording" ? "Stop recording" : "Start voice argument"}
-                className="shrink-0 flex items-center justify-center transition-all disabled:opacity-40"
+                className={`shrink-0 flex items-center justify-center transition-all disabled:opacity-40${recordState === "recording" ? " mic-active" : ""}`}
                 style={{
                   width: "44px",
                   height: "44px",
-                  ...(recordState === "recording"
-                    ? {
-                        border: "1px solid var(--gold-glow)",
-                        background: "rgba(212,175,55,0.07)",
-                      }
-                    : recordState === "processing"
+                  ...(recordState === "processing"
                     ? {
                         border: "1px solid rgba(212,175,55,0.18)",
                         background: "transparent",
                         opacity: 0.55,
                         cursor: "wait",
                       }
-                    : {
+                    : recordState === "idle"
+                    ? {
                         border: "1px solid rgba(212,175,55,0.2)",
                         background: "rgba(212,175,55,0.025)",
-                      }),
+                      }
+                    : {}),
                 }}
               >
                 {recordState === "recording" ? (

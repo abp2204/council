@@ -1,7 +1,7 @@
 """
 Tests for OpposingRole — Issue #4 acceptance criteria.
 
-Requires Ollama running locally with qwen2.5:14b.
+Requires Ollama running locally with gemma4.
 
 Run: python3 test_opposing_role.py
 """

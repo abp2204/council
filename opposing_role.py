@@ -183,7 +183,7 @@ class OpposingRole:
     across the Session. Signals session close via structured JSON output.
     """
 
-    MODEL = "qwen2.5:14b"
+    MODEL = "gemma4"
 
     def __init__(self, case_id: str, model: str | None = None) -> None:
         case = load_case(case_id, operator=True)

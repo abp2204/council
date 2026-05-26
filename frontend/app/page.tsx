@@ -16,20 +16,20 @@ interface Case {
 
 const containerVariants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.14, delayChildren: 0.55 } },
+  show: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } },
 };
 
 const itemTransition: Transition = { duration: 0.65, ease: EASE };
 const itemVariants = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 0, y: 20 },
   show:  { opacity: 1, y: 0, transition: itemTransition },
 };
 
 function GothicArch() {
   return (
     <svg
-      width="300"
-      height="140"
+      width="440"
+      height="200"
       viewBox="0 0 300 140"
       fill="none"
       aria-hidden
@@ -38,49 +38,55 @@ function GothicArch() {
       {/* Outer arch */}
       <path
         d="M16 140 C16 50, 120 6, 150 6 C180 6, 284 50, 284 140"
-        stroke="rgba(212,175,55,0.38)"
+        stroke="rgba(212,175,55,0.44)"
         strokeWidth="1.5"
         fill="none"
       />
       {/* Mid arch */}
       <path
         d="M40 140 C40 66, 122 28, 150 28 C178 28, 260 66, 260 140"
-        stroke="rgba(212,175,55,0.22)"
+        stroke="rgba(212,175,55,0.26)"
         strokeWidth="1"
         fill="none"
       />
       {/* Inner arch */}
       <path
         d="M68 140 C68 84, 126 52, 150 52 C174 52, 232 84, 232 140"
-        stroke="rgba(212,175,55,0.11)"
+        stroke="rgba(212,175,55,0.13)"
         strokeWidth="1"
         fill="none"
       />
       {/* Keystone diamond */}
-      <polygon points="150,0 155,10 150,20 145,10" fill="rgba(212,175,55,0.78)" />
-      <polygon points="150,3 153,10 150,17 147,10" fill="rgba(212,175,55,0.28)" />
+      <polygon points="150,0 156,11 150,22 144,11" fill="rgba(212,175,55,0.88)" />
+      <polygon points="150,3 154,11 150,19 146,11" fill="rgba(212,175,55,0.26)" />
       {/* Keystone ambient glow */}
-      <ellipse cx="150" cy="10" rx="10" ry="6" fill="rgba(212,175,55,0.07)" />
+      <ellipse cx="150" cy="11" rx="14" ry="8" fill="rgba(212,175,55,0.12)" />
       {/* Column shafts */}
-      <rect x="13" y="110" width="1.5" height="30" fill="rgba(212,175,55,0.18)" />
-      <rect x="286" y="110" width="1.5" height="30" fill="rgba(212,175,55,0.18)" />
+      <rect x="13" y="110" width="1.5" height="30" fill="rgba(212,175,55,0.24)" />
+      <rect x="286" y="110" width="1.5" height="30" fill="rgba(212,175,55,0.24)" />
+      {/* Column capitals */}
+      <rect x="8" y="108" width="11" height="2" rx="0.5" fill="rgba(212,175,55,0.20)" />
+      <rect x="281" y="108" width="11" height="2" rx="0.5" fill="rgba(212,175,55,0.20)" />
       {/* Column bases */}
-      <rect x="8" y="136" width="16" height="4" rx="0.5" fill="rgba(212,175,55,0.22)" />
-      <rect x="276" y="136" width="16" height="4" rx="0.5" fill="rgba(212,175,55,0.22)" />
+      <rect x="8" y="136" width="16" height="4" rx="0.5" fill="rgba(212,175,55,0.28)" />
+      <rect x="276" y="136" width="16" height="4" rx="0.5" fill="rgba(212,175,55,0.28)" />
       {/* Tracery horizontal bar */}
       <line
         x1="40" y1="96" x2="260" y2="96"
-        stroke="rgba(212,175,55,0.07)"
+        stroke="rgba(212,175,55,0.09)"
         strokeWidth="0.5"
         strokeDasharray="6 6"
       />
       {/* Tracery vertical center */}
       <line
-        x1="150" y1="20" x2="150" y2="140"
-        stroke="rgba(212,175,55,0.05)"
+        x1="150" y1="22" x2="150" y2="140"
+        stroke="rgba(212,175,55,0.06)"
         strokeWidth="0.5"
         strokeDasharray="5 8"
       />
+      {/* Tracery side verticals */}
+      <line x1="96" y1="96" x2="96" y2="140" stroke="rgba(212,175,55,0.05)" strokeWidth="0.5" />
+      <line x1="204" y1="96" x2="204" y2="140" stroke="rgba(212,175,55,0.05)" strokeWidth="0.5" />
     </svg>
   );
 }
@@ -104,18 +110,24 @@ export default function Lobby() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function startSession(caseId: string) {
-    setStarting(caseId);
+  async function startSession(c: Case) {
+    setStarting(c.id);
     try {
       const r = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ case_id: caseId }),
+        body: JSON.stringify({ case_id: c.id }),
       });
       const raw = await r.text();
       if (!r.ok) throw new Error(`http ${r.status}: ${raw}`);
       const data = JSON.parse(raw);
       sessionStorage.setItem(`council_opening_${data.session_id}`, data.opening ?? "");
+      sessionStorage.setItem(`council_case_title_${data.session_id}`, c.title);
+      sessionStorage.setItem(`council_case_meta_${data.session_id}`, JSON.stringify({
+        practice_area: c.practice_area,
+        proceeding_type: c.proceeding_type,
+        user_role: c.user_role,
+      }));
       router.push(`/session/${data.session_id}`);
     } catch (e) {
       console.error(e);
@@ -128,33 +140,33 @@ export default function Lobby() {
 
       {/* ── Hero ── */}
       <motion.header
-        className="w-full max-w-xl mx-auto px-8 pt-20 pb-16 text-center"
+        className="w-full max-w-2xl mx-auto px-8 pt-20 pb-16 text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1.1, ease: EASE }}
       >
         {/* Arch ornament */}
         <motion.div
-          initial={{ opacity: 0, y: -8 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, ease: EASE }}
+          transition={{ duration: 1.0, ease: EASE }}
         >
           <GothicArch />
         </motion.div>
 
         {/* Wordmark */}
         <motion.h1
-          className="mt-6"
+          className="mt-4"
           style={{
             fontFamily: "'Cinzel', serif",
-            fontSize: "clamp(3rem, 8vw, 5.5rem)",
+            fontSize: "clamp(3rem, 8vw, 6rem)",
             fontWeight: 600,
-            letterSpacing: "0.32em",
+            letterSpacing: "0.36em",
             color: "var(--ivory)",
-            textShadow: "0 0 80px rgba(212,175,55,0.1)",
+            textShadow: "0 0 100px rgba(212,175,55,0.12)",
             lineHeight: 1,
           }}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.9, ease: EASE }}
         >
@@ -163,7 +175,7 @@ export default function Lobby() {
 
         {/* Gold rule */}
         <motion.div
-          className="gold-rule my-7 max-w-[180px] mx-auto"
+          className="gold-rule my-7 max-w-[200px] mx-auto"
           initial={{ scaleX: 0, opacity: 0 }}
           animate={{ scaleX: 1, opacity: 1 }}
           transition={{ delay: 0.25, duration: 0.8, ease: EASE }}
@@ -172,7 +184,7 @@ export default function Lobby() {
 
         {/* Sub-tagline */}
         <motion.p
-          className="text-base leading-[1.85] italic max-w-xs mx-auto"
+          className="text-base leading-[1.85] italic max-w-sm mx-auto"
           style={{
             fontFamily: "'Playfair Display', serif",
             color: "var(--ivory-dim)",
@@ -202,7 +214,7 @@ export default function Lobby() {
       </motion.header>
 
       {/* ── Case list ── */}
-      <section className="w-full max-w-xl mx-auto px-8 pb-32">
+      <section className="w-full max-w-4xl mx-auto px-8 pb-32">
 
         {/* Section divider */}
         <motion.div
@@ -228,7 +240,7 @@ export default function Lobby() {
 
         {/* Loading skeletons */}
         {loading && (
-          <div className="space-y-5">
+          <div className="case-grid">
             {[...Array(2)].map((_, i) => (
               <div
                 key={i}
@@ -237,6 +249,7 @@ export default function Lobby() {
                   background: "var(--walnut-panel)",
                   border: "1px solid rgba(212,175,55,0.12)",
                   padding: "28px 32px",
+                  minHeight: "160px",
                 }}
               >
                 <div className="h-2 w-1/4 mb-5 rounded-sm" style={{ background: "rgba(212,175,55,0.07)" }} />
@@ -250,31 +263,37 @@ export default function Lobby() {
         {/* Case cards */}
         {!loading && !fetchError && cases.length > 0 && (
           <motion.ul
-            className="space-y-5 list-none p-0"
+            className="case-grid list-none p-0"
             variants={containerVariants}
             initial="hidden"
             animate="show"
           >
-            {cases.map((c) => (
+            {cases.map((c, idx) => (
               <motion.li key={c.id} variants={itemVariants}>
                 <div
-                  className="relative group cursor-pointer overflow-hidden gold-border pillar-shadow gold-glow-hover"
+                  className="relative group cursor-pointer overflow-hidden gold-border pillar-shadow gold-glow-hover corner-notch"
                   style={{
                     background: "linear-gradient(150deg, #241b12 0%, var(--walnut-deep) 100%)",
+                    minHeight: "190px",
                   }}
-                  onClick={() => !starting && startSession(c.id)}
+                  onClick={() => !starting && startSession(c)}
                 >
-                  {/* Left pillar accent — visible on hover */}
+                  {/* Left pillar accent */}
                   <div className="case-card-accent" aria-hidden />
 
-                  {/* Top edge accent — appears on hover */}
+                  {/* Top edge accent */}
                   <div
                     className="absolute top-0 inset-x-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                     style={{ background: "linear-gradient(to right, transparent, rgba(212,175,55,0.38) 40%, rgba(212,175,55,0.38) 60%, transparent)" }}
                     aria-hidden
                   />
 
-                  <div className="px-8 py-7">
+                  {/* Case index watermark */}
+                  <span className="case-index-num" aria-hidden>
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+
+                  <div className="px-8 py-7 relative z-10">
                     {/* Top meta row */}
                     <div className="flex items-center justify-between mb-4">
                       <span
@@ -300,64 +319,43 @@ export default function Lobby() {
                       </span>
                     </div>
 
-                    {/* Title + CTA row */}
-                    <div className="flex items-start justify-between gap-6">
-                      <div className="min-w-0 flex-1">
-                        <h2
-                          className="mb-4 leading-snug"
+                    {/* Title */}
+                    <h2
+                      className="mb-5 leading-snug"
+                      style={{
+                        fontFamily: "'Cinzel', serif",
+                        fontSize: "1.1rem",
+                        fontWeight: 500,
+                        letterSpacing: "0.04em",
+                        color: "var(--ivory)",
+                      }}
+                    >
+                      {c.title}
+                    </h2>
+
+                    {/* Role line + CTA */}
+                    <div className="flex items-end justify-between gap-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-px w-7" style={{ background: "rgba(212,175,55,0.28)" }} />
+                        <p
+                          className="text-sm"
                           style={{
-                            fontFamily: "'Cinzel', serif",
-                            fontSize: "1.15rem",
-                            fontWeight: 500,
-                            letterSpacing: "0.04em",
-                            color: "var(--ivory)",
+                            fontFamily: "'Playfair Display', serif",
+                            color: "var(--ivory-dim)",
                           }}
                         >
-                          {c.title}
-                        </h2>
-
-                        {/* Role line */}
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-px w-7" style={{ background: "rgba(212,175,55,0.28)" }} />
-                          <p
-                            className="text-sm"
-                            style={{
-                              fontFamily: "'Playfair Display', serif",
-                              color: "var(--ivory-dim)",
-                            }}
-                          >
-                            Arguing as{" "}
-                            <span
-                              className="not-italic font-medium"
-                              style={{ color: "var(--ivory)" }}
-                            >
-                              {c.user_role}
-                            </span>
-                          </p>
-                        </div>
+                          Arguing as{" "}
+                          <span className="not-italic font-medium" style={{ color: "var(--ivory)" }}>
+                            {c.user_role}
+                          </span>
+                        </p>
                       </div>
 
                       {/* CTA button */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (!starting) startSession(c.id); }}
+                        onClick={(e) => { e.stopPropagation(); if (!starting) startSession(c); }}
                         disabled={starting !== null}
-                        className="shrink-0 mt-0.5 text-xs font-medium transition-all disabled:opacity-40 whitespace-nowrap"
-                        style={{
-                          fontFamily: "'Cinzel', serif",
-                          letterSpacing: "0.18em",
-                          padding: "10px 22px",
-                          border: "1px solid rgba(212,175,55,0.38)",
-                          color: "var(--gold-glow)",
-                          background: "rgba(212,175,55,0.04)",
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(212,175,55,0.1)";
-                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(212,175,55,0.6)";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(212,175,55,0.04)";
-                          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(212,175,55,0.38)";
-                        }}
+                        className="chamber-enter-btn shrink-0 text-xs"
                       >
                         {starting === c.id ? (
                           <span className="flex items-center gap-2">
@@ -368,7 +366,7 @@ export default function Lobby() {
                             Entering
                           </span>
                         ) : (
-                          "Argue →"
+                          "Enter the Chamber →"
                         )}
                       </button>
                     </div>
