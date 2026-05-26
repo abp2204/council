@@ -31,6 +31,7 @@ from enum import Enum, auto
 from case_library import load_case
 from deviation_detector import DeviationDetector
 from domain import KeyMoment, MoveResult, Score, Turn
+from opposing_role import MockOpposingRole, OpposingRoleProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -73,55 +74,14 @@ class _SessionState:
     deviation_count: int = 0
     score: Score | None = None
     case: dict = field(default_factory=dict)
-    opposing_role: object = field(default=None, repr=False)
+    opposing_role: OpposingRoleProtocol | None = field(default=None, repr=False)
     last_response: str = ""
 
 
 # ── Mock stubs (injected for tests) ──────────────────────────────────────────
 
-class MockOpposingRole:
-    """
-    Offline opponent for tests — no API key required.
-
-    Cycles through mock_probes in round-robin order and closes once all
-    probes have been delivered at least once and the caller has submitted
-    at least 3 user turns. Instance is per-session; do not share across sessions.
-    """
-
-    def __init__(self, mock_probes: list[str], mock_close: str) -> None:
-        if not mock_probes:
-            raise ValueError("mock_probes must be a non-empty list")
-        self._probes = mock_probes
-        self._close = mock_close
-        self._probe_index = 0
-        self._probes_completed = False
-
-    def respond(self, turns: list[Turn]) -> tuple[str, bool]:
-        user_turns = [t for t in turns if t.role == "user"]
-        n = len(user_turns)
-
-        if not self._probes_completed and self._probe_index >= len(self._probes):
-            self._probes_completed = True
-
-        if self._probes_completed and n >= 3:
-            return self._close, True
-
-        response = self._probes[self._probe_index % len(self._probes)]
-        self._probe_index += 1
-
-        if self._probe_index >= len(self._probes):
-            self._probes_completed = True
-
-        closes = self._probes_completed and n >= 3
-        return response, closes
-
-    def respond_stream(self, turns: list[Turn]):
-        """Stream mock response word-by-word; return closes via StopIteration.value."""
-        text, closes = self.respond(turns)
-        words = text.split(" ")
-        for i, word in enumerate(words):
-            yield word if i == len(words) - 1 else word + " "
-        return closes
+# MockOpposingRole is imported from opposing_role — see import above.
+# Re-exported via __all__ so existing imports from session_engine still work.
 
 
 class MockEvaluator:
@@ -184,14 +144,14 @@ class SessionEngine:
 
     def __init__(
         self,
-        opposing_role_factory: Callable[[dict], object],
+        opposing_role_factory: Callable[[dict], OpposingRoleProtocol],
         evaluator: object,
     ) -> None:
         if opposing_role_factory is None:
             raise ValueError("opposing_role_factory is required")
         if evaluator is None:
             raise ValueError("evaluator is required")
-        self._opposing_role_factory = opposing_role_factory
+        self._opposing_role_factory: Callable[[dict], OpposingRoleProtocol] = opposing_role_factory
         self._evaluator = evaluator
         self._sessions: dict[str, _SessionState] = {}
         self._detector = DeviationDetector()
@@ -334,7 +294,7 @@ class SessionEngine:
     def get_opening(self, session_id: str) -> str:
         return self._get_session(session_id).turns[0].text
 
-    def get_opposing_role(self, session_id: str) -> object:
+    def get_opposing_role(self, session_id: str) -> OpposingRoleProtocol | None:
         return self._get_session(session_id).opposing_role
 
     def get_last_response(self, session_id: str) -> str | None:
