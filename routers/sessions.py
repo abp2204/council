@@ -1,22 +1,12 @@
 from __future__ import annotations
 
-import dataclasses
-from dataclasses import dataclass
-
 import session_store
 from dependencies import engine_dep
 from fastapi import APIRouter, Depends, HTTPException
-from session_engine import InvalidStateError, SessionEngine
+from session_engine import SessionEngine
+from session_store import PersistedSession
 
 router = APIRouter(tags=["sessions"])
-
-
-@dataclass
-class _SaveAdapter:
-    case_id: str
-    session_id: str
-    turns: list
-    score: dict
 
 
 @router.post("/sessions", status_code=201)
@@ -43,18 +33,14 @@ def evaluate_session(
         {"turn": km.turn, "label": km.label, "user_text": km.user_text, "commentary": km.commentary}
         for km in score.key_moments
     ]
-    adapter = _SaveAdapter(
+
+    persisted = PersistedSession(
         case_id=engine.get_case_id(session_id),
         session_id=session_id,
-        turns=[dataclasses.asdict(t) for t in engine.get_turns(session_id)],
-        score={
-            "legal_soundness": score.legal_soundness,
-            "strategic_effectiveness": score.strategic_effectiveness,
-            "creativity": score.creativity,
-            "key_moments": key_moments,
-        },
+        turns=engine.get_turns(session_id),
+        score=score,
     )
-    session_store.save_session(adapter)
+    session_store.save_session(persisted)
 
     return {
         "legal_soundness": score.legal_soundness,
@@ -73,9 +59,9 @@ def session_history(
     records = session_store.load_sessions(case_id)
     return [
         {
-            "session_id": r["session_id"],
-            "timestamp": r["timestamp"],
-            "score": r["score"],
+            "session_id": r.session_id,
+            "timestamp": r.timestamp,
+            "score": session_store._score_to_dict(r.score) if r.score is not None else None,
         }
         for r in records
     ]

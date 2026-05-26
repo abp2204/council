@@ -7,12 +7,13 @@ sessions/council.db file is never touched.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
 import session_store as ss
+from domain import Score, Turn
+from session_store import PersistedSession
 
 
 # ---------------------------------------------------------------------------
@@ -20,27 +21,18 @@ import session_store as ss
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class _FakeSession:
-    case_id: str
-    session_id: str
-    turns: list
-    score: dict
-    user_id: str | None = None
-
-
 def _make_score(
     legal: int = 70,
     strategic: int = 65,
     creativity: int = 60,
     key_moments: list | None = None,
-) -> dict:
-    return {
-        "legal_soundness": legal,
-        "strategic_effectiveness": strategic,
-        "creativity": creativity,
-        "key_moments": key_moments or [],
-    }
+) -> Score:
+    return Score(
+        legal_soundness=legal,
+        strategic_effectiveness=strategic,
+        creativity=creativity,
+        key_moments=key_moments or [],
+    )
 
 
 def _make_session(
@@ -48,11 +40,11 @@ def _make_session(
     session_id: str = "sess-001",
     user_id: str | None = None,
     **score_kwargs,
-) -> _FakeSession:
-    return _FakeSession(
+) -> PersistedSession:
+    return PersistedSession(
         case_id=case_id,
         session_id=session_id,
-        turns=[{"role": "user", "text": "arg1"}],
+        turns=[Turn(role="user", text="arg1")],
         score=_make_score(**score_kwargs),
         user_id=user_id,
     )
@@ -77,9 +69,9 @@ def test_save_and_load_basic():
     records = ss.load_sessions("brown")
     assert len(records) == 1
     r = records[0]
-    assert r["session_id"] == "sess-001"
-    assert r["case_id"] == "brown"
-    assert r["score"]["legal_soundness"] == 70
+    assert r.session_id == "sess-001"
+    assert r.case_id == "brown"
+    assert r.score.legal_soundness == 70
 
 
 def test_load_returns_empty_for_unknown_case():
@@ -92,7 +84,7 @@ def test_multiple_sessions_ordered_oldest_first():
         ss.save_session(_make_session(session_id=sid, legal=60 + i * 5))
 
     records = ss.load_sessions("brown")
-    assert [r["session_id"] for r in records] == ["s1", "s2", "s3"]
+    assert [r.session_id for r in records] == ["s1", "s2", "s3"]
 
 
 def test_save_session_no_flat_json_written():
@@ -114,10 +106,10 @@ def test_load_sessions_filters_by_user_id():
     ss.save_session(_make_session(session_id="u1-s2", user_id="user-1"))
 
     user1 = ss.load_sessions("brown", user_id="user-1")
-    assert {r["session_id"] for r in user1} == {"u1-s1", "u1-s2"}
+    assert {r.session_id for r in user1} == {"u1-s1", "u1-s2"}
 
     user2 = ss.load_sessions("brown", user_id="user-2")
-    assert {r["session_id"] for r in user2} == {"u2-s1"}
+    assert {r.session_id for r in user2} == {"u2-s1"}
 
 
 def test_load_sessions_no_filter_returns_all_users():
@@ -134,12 +126,23 @@ def test_load_sessions_no_filter_returns_all_users():
 
 
 def test_key_moments_round_trip():
-    km = {"turn": 2, "label": "best_move", "user_text": "great arg", "commentary": "solid"}
-    s = _make_session(key_moments=[km])
+    from domain import KeyMoment
+    km = KeyMoment(turn=2, label="best_move", user_text="great arg", commentary="solid")
+    score = _make_score(key_moments=[km])
+    s = PersistedSession(
+        case_id="brown",
+        session_id="sess-001",
+        turns=[Turn(role="user", text="arg1")],
+        score=score,
+    )
     ss.save_session(s)
 
     records = ss.load_sessions("brown")
-    assert records[0]["score"]["key_moments"] == [km]
+    loaded_km = records[0].score.key_moments[0]
+    assert loaded_km.turn == 2
+    assert loaded_km.label == "best_move"
+    assert loaded_km.user_text == "great arg"
+    assert loaded_km.commentary == "solid"
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +156,7 @@ def test_save_session_upserts_on_duplicate_session_id():
 
     records = ss.load_sessions("brown")
     assert len(records) == 1
-    assert records[0]["score"]["legal_soundness"] == 99
+    assert records[0].score.legal_soundness == 99
 
 
 # ---------------------------------------------------------------------------
