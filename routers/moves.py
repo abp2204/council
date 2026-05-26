@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
-from session_engine import InvalidStateError, SessionEngine
+from collections.abc import Callable
+
+from dependencies import engine_dep, transcriber_dep
+from fastapi import APIRouter, Depends, HTTPException, Request
+from session_engine import SessionEngine
 
 router = APIRouter(tags=["moves"])
 
 
-def _get_engine() -> SessionEngine:
-    from dependencies import get_engine
-    return get_engine()
-
-
-def _get_transcriber():
-    from dependencies import get_transcriber
-    return get_transcriber()
-
-
 @router.post("/sessions/{session_id}/moves")
-async def submit_move(session_id: str, request: Request) -> dict:
+async def submit_move(
+    session_id: str,
+    request: Request,
+    engine: SessionEngine = Depends(engine_dep),
+    transcribe: Callable[[bytes], str] = Depends(transcriber_dep),
+) -> dict:
     content_type = request.headers.get("content-type", "")
     transcription: str | None = None
 
@@ -27,7 +25,7 @@ async def submit_move(session_id: str, request: Request) -> dict:
         if audio_file is None:
             raise HTTPException(400, "Multipart request missing 'audio' field")
         audio_bytes = await audio_file.read()
-        text = _get_transcriber()(audio_bytes)
+        text = transcribe(audio_bytes)
         transcription = text
     else:
         try:
@@ -38,7 +36,6 @@ async def submit_move(session_id: str, request: Request) -> dict:
         if not text:
             raise HTTPException(400, "JSON body missing 'text' field")
 
-    engine = _get_engine()
     # KeyError → 404, InvalidStateError → 409 handled by app exception handlers
     deviation = engine.prepare_move(session_id, text)
 
